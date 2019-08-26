@@ -1,5 +1,6 @@
-import { ECSignature } from '@0xproject/types';
-import { BigNumber } from '@0xproject/utils';
+import { ALink } from '@0x/react-shared';
+import { ObjectMap, SignedOrder } from '@0x/types';
+import { BigNumber } from '@0x/utils';
 import { Provider } from 'ethereum-types';
 import * as React from 'react';
 
@@ -56,28 +57,12 @@ export interface OrderToken {
     decimals: number;
 }
 
-export interface SignedOrder {
-    maker: string;
-    taker: string;
-    makerTokenAddress: string;
-    takerTokenAddress: string;
-    makerFee: string;
-    takerFee: string;
-    makerTokenAmount: string;
-    takerTokenAmount: string;
-    expirationUnixTimestampSec: string;
-    feeRecipient: string;
-    salt: string;
-    ecSignature: ECSignature;
-    exchangeContractAddress: string;
-}
-
 export interface OrderMetadata {
     makerToken: OrderToken;
     takerToken: OrderToken;
 }
 
-export interface Order {
+export interface PortalOrder {
     signedOrder: SignedOrder;
     metadata: OrderMetadata;
 }
@@ -98,12 +83,12 @@ export interface Fill {
 }
 
 export enum BalanceErrs {
-    incorrectNetworkForFaucet,
-    faucetRequestFailed,
-    faucetQueueIsFull,
-    mintingFailed,
-    sendFailed,
-    allowanceSettingFailed,
+    IncorrectNetworkForFaucet,
+    FaucetRequestFailed,
+    FaucetQueueIsFull,
+    MintingFailed,
+    SendFailed,
+    AllowanceSettingFailed,
 }
 
 export enum ActionTypes {
@@ -120,7 +105,7 @@ export enum ActionTypes {
     UpdateChosenAssetTokenAddress = 'UPDATE_CHOSEN_ASSET_TOKEN_ADDRESS',
     UpdateOrderTakerAddress = 'UPDATE_ORDER_TAKER_ADDRESS',
     UpdateOrderSalt = 'UPDATE_ORDER_SALT',
-    UpdateOrderECSignature = 'UPDATE_ORDER_EC_SIGNATURE',
+    UpdateOrderSignature = 'UPDATE_ORDER_SIGNATURE',
     UpdateTokenByAddress = 'UPDATE_TOKEN_BY_ADDRESS',
     RemoveTokenFromTokenByAddress = 'REMOVE_TOKEN_FROM_TOKEN_BY_ADDRESS',
     ForceTokenStateRefetch = 'FORCE_TOKEN_STATE_REFETCH',
@@ -206,6 +191,10 @@ export enum ExchangeContractErrs {
     InsufficientRemainingFillAmount = 'INSUFFICIENT_REMAINING_FILL_AMOUNT',
 }
 
+export interface GoogleSheetLeadUrls {
+    [key: string]: string;
+}
+
 export interface ContractResponse {
     logs: ContractEvent[];
 }
@@ -224,8 +213,8 @@ export enum ScreenWidths {
 }
 
 export enum AlertTypes {
-    ERROR,
-    SUCCESS,
+    Error,
+    Success,
 }
 
 export enum BlockchainErrs {
@@ -243,14 +232,105 @@ export enum BlockchainCallErrs {
 }
 
 export enum Environments {
-    DEVELOPMENT = 'DEVELOPMENT',
-    DOGFOOD = 'DOGFOOD',
-    STAGING = 'STAGING',
-    PRODUCTION = 'PRODUCTION',
-    UNKNOWN = 'UNKNOWN',
+    Development = 'DEVELOPMENT',
+    Dogfood = 'DOGFOOD',
+    Staging = 'STAGING',
+    Production = 'PRODUCTION',
+    Unknown = 'UNKNOWN',
 }
 
 export type ContractInstance = any; // TODO: add type definition for Contract
+
+export interface ExploreProjectInstantMetadata {
+    orderSource: string;
+    availableAssetDatas?: string[];
+}
+
+export interface ExploreProject {
+    name: string;
+    label: string;
+    description: string;
+    logo_url: string;
+    theme_color: string;
+    url: string;
+    keywords: string[];
+    instant?: ExploreProjectInstantMetadata;
+    logo_max_width?: string;
+    onInstantClick?(): void;
+    onAnalytics?(action: ExploreAnalyticAction): void;
+}
+
+export enum ExploreAnalyticAction {
+    InstantClick = 'INSTANT_CLICK',
+    LinkClick = 'LINK_CLICK',
+    FilterClick = 'FILTER_CLICK',
+    QuerySearched = 'QUERY_SEARCHED',
+}
+
+export enum ExploreTilesOrdering {
+    Alphabetical = 'ALPHABETICAL',
+    RecentlyAdded = 'RECENTLY_ADDED',
+    Popular = 'POPULAR',
+}
+
+export enum ExploreTilesOrderingType {
+    HardCodedByName = 'HARDCODED_BY_NAME',
+    // for other ordering logics in the future
+    DynamicBySortFunction = 'DYNAMIC_BY_SORT',
+}
+
+export interface ExploreTilesOrderingMetadata {
+    label: string;
+    ordering: ExploreTilesOrdering;
+    type: ExploreTilesOrderingType;
+    hardCoded?: string[];
+    sort?(tiles: ExploreTile[]): ExploreTile[];
+}
+
+export enum ExploreTilesModifiers {
+    Filter = 'FILTER',
+    Search = 'SEARCH',
+    Editorial = 'EDITORIAL',
+    Ordering = 'ORDERING',
+}
+
+export enum ExploreFilterType {
+    All = 'ALL',
+    Keyword = 'Keyword',
+}
+
+export interface ExploreFilterMetadata {
+    label: string;
+    filterType: ExploreFilterType;
+    name: string;
+    active?: boolean;
+}
+
+export enum ExploreTileVisibility {
+    Hidden = 'HIDDEN',
+    Visible = 'VISIBLE',
+}
+
+export enum ExploreTileWidth {
+    OneThird = 'ONE_THIRD',
+    FullWidth = 'FULL_WIDTH',
+    Half = 'HALF',
+    TwoThirds = 'TWO_THIRDS',
+}
+
+export enum ExploreTileGridWidth {
+    ThreeColumn = 6,
+    TwoColumn = 4,
+    OneColumn = 2,
+}
+
+export interface ExploreTile {
+    name: string;
+    visibility: ExploreTileVisibility;
+    width?: ExploreTileWidth;
+    exploreProject?: ExploreProject;
+    component?: React.ReactNode;
+}
 
 export interface FAQQuestion {
     prompt: string;
@@ -338,9 +418,9 @@ export interface DialogConfigs {
 }
 
 export enum TokenVisibility {
-    ALL = 'ALL',
-    UNTRACKED = 'UNTRACKED',
-    TRACKED = 'TRACKED',
+    All = 'ALL',
+    Untracked = 'UNTRACKED',
+    Tracked = 'TRACKED',
 }
 
 export interface VersionToFilePath {
@@ -365,19 +445,40 @@ export enum WebsitePaths {
     Docs = '/docs',
     ZeroExJs = '/docs/0x.js',
     Home = '/',
-    FAQ = '/faq',
+    FAQ = '/faq', // tslint:disable-line:enum-naming
     About = '/about',
+    AboutMission = '/about/mission',
+    AboutTeam = '/about/team',
+    AboutPress = '/about/press',
+    AboutJobs = '/about/jobs',
+    Community = '/community',
+    LaunchKit = '/launch-kit',
+    Instant = '/instant',
+    Ecosystem = '/eap',
+    MarketMaker = '/market-maker',
+    Governance = '/governance',
+    Why = '/why',
     Whitepaper = '/pdfs/0x_white_paper.pdf',
     SmartContracts = '/docs/contracts',
     Connect = '/docs/connect',
     Web3Wrapper = '/docs/web3-wrapper',
+    ContractWrappers = '/docs/contract-wrappers',
+    OrderWatcher = '/docs/order-watcher',
     SolCompiler = '/docs/sol-compiler',
     JSONSchemas = '/docs/json-schemas',
-    SolCov = '/docs/sol-cov',
+    SolCoverage = '/docs/sol-coverage',
+    SolProfiler = '/docs/sol-profiler',
+    SolTrace = '/docs/sol-trace',
     Subproviders = '/docs/subproviders',
     OrderUtils = '/docs/order-utils',
     EthereumTypes = '/docs/ethereum-types',
+    AssetBuyer = '/docs/asset-buyer',
+    Migrations = '/docs/migrations',
     Careers = '/careers',
+    Credits = '/credits',
+    Vote = '/vote',
+    Extensions = '/extensions',
+    Explore = '/explore',
 }
 
 export enum DocPackages {
@@ -387,10 +488,16 @@ export enum DocPackages {
     Web3Wrapper = 'WEB3_WRAPPER',
     SolCompiler = 'SOL_COMPILER',
     JSONSchemas = 'JSON_SCHEMAS',
-    SolCov = 'SOL_COV',
+    SolCoverage = 'SOL_COVERAGE',
+    SolTrace = 'SOL_TRACE',
+    SolProfiler = 'SOL_PROFILER',
     Subproviders = 'SUBPROVIDERS',
     OrderUtils = 'ORDER_UTILS',
     EthereumTypes = 'ETHEREUM_TYPES',
+    ContractWrappers = 'CONTRACT_WRAPPERS',
+    OrderWatcher = 'ORDER_WATCHER',
+    AssetBuyer = 'ASSET_BUYER',
+    Migrations = 'MIGRATIONS',
 }
 
 export enum Key {
@@ -407,10 +514,11 @@ export enum Key {
     TraditionalAssets = 'TRADITIONAL_ASSETS',
     DigitalGoods = 'DIGITAL_GOODS',
     OffChainOrderRelay = 'OFFCHAIN_ORDER_RELAY',
-    OonChainSettlement = 'OONCHAIN_SETTLEMENT',
+    OnChainSettlement = 'ONCHAIN_SETTLEMENT',
     OffChainOnChainDescription = 'OFFCHAIN_ONCHAIN_DESCRIPTION',
     RelayersHeader = 'RELAYERS_HEADER',
     BenefitsHeader = 'BENEFITS_HEADER',
+    UseCasesHeader = 'USE_CASES_HEADER',
     BenefitOneTitle = 'BENEFIT_ONE_TITLE',
     BenefitOneDescription = 'BENEFIT_ONE_DESCRIPTION',
     BenefitTwoTitle = 'BENEFIT_TWO_TITLE',
@@ -432,6 +540,10 @@ export enum Key {
     DecentralizedLoansDescription = 'DECENTRALIZED_LOANS_DESCRIPTION',
     FundManagement = 'FUND_MANAGEMENT',
     FundManagementDescription = 'FUND_MANAGEMENT_DESCRIPTION',
+    GamingAndCollectables = 'GAMING_AND_COLLECTABLES',
+    GamingAndCollectablesDescription = 'GAMING_AND_COLLECTABLES_DESCRIPTION',
+    OrderBooks = 'ORDER_BOOKS',
+    OrderBooksDescription = 'ORDER_BOOKS_DESCRIPTION',
     FinalCallToAction = 'FINAL_CALL_TO_ACTION',
     Documentation = 'DOCUMENTATION',
     Community = 'COMMUNITY',
@@ -444,6 +556,10 @@ export enum Key {
     SolCov = 'SOL_COV',
     EthereumTypes = 'ETHEREUM_TYPES',
     Subproviders = 'SUBPROVIDERS',
+    ZeroExJs = '0X_JS',
+    ContractWrappers = 'CONTRACT_WRAPPERS',
+    OrderWatcher = 'ORDER_WATCHER',
+    AssetBuyer = 'ASSET_BUYER',
     Blog = 'BLOG',
     Forum = 'FORUM',
     Connect = 'CONNECT',
@@ -459,8 +575,42 @@ export enum Key {
     Website = 'WEBSITE',
     Developers = 'DEVELOPERS',
     Home = 'HOME',
-    RocketChat = 'ROCKETCHAT',
+    Discord = 'DISCORD',
     TradeCallToAction = 'TRADE_CALL_TO_ACTION',
+    OurMissionAndValues = 'OUR_MISSION_AND_VALUES',
+    BuildARelayer = 'BUILD_A_RELAYER',
+    BuildARelayerDescription = 'BUILD_A_RELAYER_DESCRIPTION',
+    DevelopOnEthereum = 'DEVELOP_ON_ETHEREUM',
+    DevelopOnEthereumDescription = 'DEVELOP_ON_ETHEREUM_DESCRIPTION',
+    OrderBasics = 'ORDER_BASICS',
+    OrderBasicsDescription = 'ORDER_BASICS_DESCRIPTION',
+    UseNetworkedLiquidity = 'USE_NETWORKED_LIQUIDITY',
+    UseNetworkedLiquidityDescription = 'USE_NETWORKED_LIQUIDITY_DESCRIPTION',
+    Integrate0xInstant = 'INTEGRATE_0X_INSTANT',
+    Integrate0xInstantDescription = 'INTEGRATE_0X_INSTANT_DESCRIPTION',
+    ViewAllDocumentation = 'VIEW_ALL_DOCUMENTATION',
+    Sandbox = 'SANDBOX',
+    Github = 'GITHUB',
+    LiveChat = 'LIVE_CHAT',
+    LibrariesAndTools = 'LIBRARIES_AND_TOOLS',
+    LibrariesAndToolsDescription = 'LIBRARIES_AND_TOOLS_DESCRIPTION',
+    More = 'MORE',
+    StartBuildOn0x = 'START_BUILDING_ON_0X',
+    StartBuildOn0xDescription = 'START_BUILDING_ON_0X_DESCRIPTION',
+    LaunchKit = 'LAUNCH_KIT',
+    LaunchKitPitch = 'LAUNCH_KIT_PITCH',
+    ExploreTheDocs = 'EXPLORE_THE_DOCS',
+    EnableTrading = 'ENABLE_TRADING',
+    ForkAndExtend = 'FORK_AND_EXTEND',
+    LocalMarket = 'LOCAL_MARKET',
+    SeemlesslyCreate = 'SEEMLESSLY_CREATE',
+    QuicklyLaunch = 'QUICKLY_LAUNCH',
+    TapIntoAndShare = 'TAP_INTO_AND_SHARE',
+    PerfectForDevelopers = 'PERFECT_FOR_DEVELOPERS',
+    GetInTouch = 'GET_IN_TOUCH',
+    LearnMore = 'LEARN_MORE',
+    GetStarted = 'GET_STARTED',
+    ProtocolSpecification = 'PROTOCOL_SPECIFICATION',
 }
 
 export enum SmartContractDocSections {
@@ -494,7 +644,7 @@ export enum Providers {
     Parity = 'PARITY',
     Metamask = 'METAMASK',
     Mist = 'MIST',
-    Toshi = 'TOSHI',
+    CoinbaseWallet = 'COINBASE_WALLET',
     Cipher = 'CIPHER',
 }
 
@@ -521,10 +671,6 @@ export interface OutdatedWrappedEtherByNetworkId {
 }
 
 export type ItemByAddress<T> = ObjectMap<T>;
-
-export interface ObjectMap<T> {
-    [key: string]: T;
-}
 
 export type TokenStateByAddress = ItemByAddress<TokenState>;
 
@@ -576,12 +722,14 @@ export enum BrowserType {
     Chrome = 'Chrome',
     Firefox = 'Firefox',
     Opera = 'Opera',
+    Safari = 'Safari',
+    Edge = 'Edge',
     Other = 'Other',
 }
 
 export enum OperatingSystemType {
     Android = 'Android',
-    iOS = 'iOS',
+    iOS = 'iOS', // tslint:disable-line:enum-naming
     Mac = 'Mac',
     Windows = 'Windows',
     WindowsPhone = 'WindowsPhone',
@@ -600,11 +748,21 @@ export interface InjectedProvider extends Provider {
     publicConfigStore?: InjectedProviderObservable;
 }
 
-// Minimal expected interface for an injected web3 object
-export interface InjectedWeb3 {
-    currentProvider: InjectedProvider;
-    version: {
-        getNetwork(cd: (err: Error, networkId: string) => void): void;
-    };
+export interface TutorialInfo {
+    iconUrl: string;
+    description: string;
+    link: ALink;
+}
+
+export enum Categories {
+    ZeroExProtocolTypescript = '0x Protocol (Typescript/Javascript)',
+    ZeroExProtocolPython = '0x Protocol (Python)',
+    Ethereum = 'Ethereum (Typescript/Javascript)',
+    CommunityMaintained = 'Community Maintained',
+}
+
+export interface Package {
+    description: string;
+    link: ALink;
 }
 // tslint:disable:max-file-line-count

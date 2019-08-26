@@ -1,4 +1,4 @@
-## @0xproject/subproviders
+## @0x/subproviders
 
 A few useful web3 subproviders including a LedgerSubprovider useful for adding Ledger Nano S support.
 
@@ -9,14 +9,14 @@ We have written up a [Wiki](https://0xproject.com/wiki#Web3-Provider-Examples) a
 ## Installation
 
 ```
-yarn add @0xproject/subproviders
+yarn add @0x/subproviders
 ```
 
 If your project is in [TypeScript](https://www.typescriptlang.org/), add the following to your `tsconfig.json`:
 
 ```json
 "compilerOptions": {
-    "typeRoots": ["node_modules/@0xproject/typescript-typings/types", "node_modules/@types"],
+    "typeRoots": ["node_modules/@0x/typescript-typings/types", "node_modules/@types"],
 }
 ```
 
@@ -45,13 +45,13 @@ yarn install
 To build this package and all other monorepo packages that it depends on, run the following from the monorepo root directory:
 
 ```bash
-PKG=@0xproject/subproviders yarn build
+PKG=@0x/subproviders yarn build
 ```
 
 Or continuously rebuild on change:
 
 ```bash
-PKG=@0xproject/subproviders yarn watch
+PKG=@0x/subproviders yarn watch
 ```
 
 ### Clean
@@ -78,12 +78,12 @@ yarn run test:unit
 
 In order to run the integration tests, make sure you have a Ledger Nano S available.
 
-*   Setup your Ledger with the development mnemonic seed: `concert load couple harbor equip island argue ramp clarify fence smart topic`
-*   Plug it into your computer
-*   Unlock the device
-*   Open the on-device Ethereum app
-*   Make sure "browser support" and "contract data" are disabled
-*   Start [TestRPC](https://github.com/trufflesuite/ganache-cli) locally at port `8545`
+-   Setup your Ledger with the development mnemonic seed: `concert load couple harbor equip island argue ramp clarify fence smart topic`
+-   Plug it into your computer
+-   Unlock the device
+-   Open the on-device Ethereum app
+-   Make sure "browser support" and "contract data" are disabled
+-   Start [TestRPC](https://github.com/trufflesuite/ganache-cli) locally at port `8545`
 
 Then run:
 

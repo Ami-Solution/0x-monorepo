@@ -1,7 +1,7 @@
-import { colors, EtherscanLinkSuffixes, utils as sharedUtils } from '@0xproject/react-shared';
+import { colors, EtherscanLinkSuffixes, utils as sharedUtils } from '@0x/react-shared';
 import * as _ from 'lodash';
 import * as React from 'react';
-import ReactTooltip = require('react-tooltip');
+import ReactTooltip from 'react-tooltip';
 
 interface EtherScanIconProps {
     addressOrTxHash: string;
@@ -18,7 +18,7 @@ export const EtherScanIcon = (props: EtherScanIconProps) => {
     const transactionTooltipId = `${props.addressOrTxHash}-etherscan-icon-tooltip`;
     return (
         <div className="inline">
-            {!_.isUndefined(etherscanLinkIfExists) ? (
+            {etherscanLinkIfExists !== undefined ? (
                 <a href={etherscanLinkIfExists} target="_blank">
                     {renderIcon()}
                 </a>

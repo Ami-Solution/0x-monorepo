@@ -2,9 +2,8 @@
 
 This repository contains our website and [0x Portal DApp][portal-url] (over-the-counter exchange), facilitating trustless over-the-counter trading of Ethereum-based tokens using 0x protocol.
 
-[website-url]: https://0xproject.com/
-[whitepaper-url]: https://0xproject.com/pdfs/0x_white_paper.pdf
-[portal-url]: https://0xproject.com/portal
+[website-url]: https://0x.org/
+[portal-url]: https://0x.org/portal
 
 ## Contributing
 
@@ -14,7 +13,7 @@ Please read our [contribution guidelines](../../CONTRIBUTING.md) before getting 
 
 ## Local Dev Setup
 
-Requires Node version 6.9.5 or higher.
+Requires Node version 6.9.5 or higher
 
 Add the following to your `/etc/hosts` file:
 
@@ -33,13 +32,13 @@ yarn install
 To build this package and all other monorepo packages that it depends on, run the following from the monorepo root directory:
 
 ```bash
-PKG=@0xproject/website yarn build
+PKG=@0x/website yarn build
 ```
 
 ### Run dev server
 
 ```bash
-PKG=@0xproject/website yarn watch
+PKG=@0x/website yarn watch
 ```
 
 Visit [0xproject.localhost:3572](http://0xproject.localhost:3572) in your browser.
@@ -60,11 +59,11 @@ yarn lint
 
 ##### Toolkit
 
-*   [Material Design Icon Font](http://zavoloklom.github.io/material-design-iconic-font/icons.html#directional)
-*   [BassCSS toolkit](http://basscss.com/)
-*   [Material-UI component library](http://www.material-ui.com/#/)
+-   [Material Design Icon Font](http://zavoloklom.github.io/material-design-iconic-font/icons.html#directional)
+-   [BassCSS toolkit](http://basscss.com/)
+-   [Material-UI component library](http://www.material-ui.com/#/)
 
 ##### Recommended Atom packages:
 
-*   [atom-typescript](https://atom.io/packages/atom-typescript)
-*   [linter-tslint](https://atom.io/packages/linter-tslint)
+-   [atom-typescript](https://atom.io/packages/atom-typescript)
+-   [linter-tslint](https://atom.io/packages/linter-tslint)

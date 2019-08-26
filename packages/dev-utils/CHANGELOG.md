@@ -5,7 +5,139 @@ Edit the package's CHANGELOG.json file only.
 
 CHANGELOG
 
-## v1.0.4 - _August 13, 2018_
+## v2.2.4 - _July 13, 2019_
+
+    * Dependencies updated
+
+## v2.2.3 - _May 24, 2019_
+
+    * Dependencies updated
+
+## v2.2.2 - _May 10, 2019_
+
+    * Dependencies updated
+
+## v2.2.1 - _April 11, 2019_
+
+    * Dependencies updated
+
+## v2.2.0 - _March 21, 2019_
+
+    * Added `startProviderEngine` to `providerUtils`. Preventing excess block polling (#1695)
+
+## v2.1.4 - _March 20, 2019_
+
+    * Dependencies updated
+
+## v2.1.3 - _March 1, 2019_
+
+    * Dependencies updated
+
+## v2.1.2 - _February 26, 2019_
+
+    * Dependencies updated
+
+## v2.1.1 - _February 25, 2019_
+
+    * Dependencies updated
+
+## v2.1.0 - _February 9, 2019_
+
+    * Allow using the Web3Factory in-process Ganache provider with existing DB snapshot (#1602)
+
+## v2.0.2 - _February 7, 2019_
+
+    * Dependencies updated
+
+## v2.0.1 - _February 6, 2019_
+
+    * Dependencies updated
+
+## v2.0.0 - _February 5, 2019_
+
+    * Upgrade the bignumber.js to v8.0.2 (#1517)
+
+## v1.0.24 - _January 15, 2019_
+
+    * Dependencies updated
+
+## v1.0.23 - _January 11, 2019_
+
+    * Dependencies updated
+
+## v1.0.22 - _January 9, 2019_
+
+    * Dependencies updated
+
+## v1.0.21 - _December 13, 2018_
+
+    * Dependencies updated
+
+## v1.0.20 - _December 11, 2018_
+
+    * Dependencies updated
+
+## v1.0.19 - _November 28, 2018_
+
+    * Dependencies updated
+
+## v1.0.18 - _November 21, 2018_
+
+    * Dependencies updated
+
+## v1.0.17 - _November 14, 2018_
+
+    * Dependencies updated
+
+## v1.0.16 - _November 13, 2018_
+
+    * Dependencies updated
+
+## v1.0.15 - _November 12, 2018_
+
+    * Dependencies updated
+
+## v1.0.14 - _November 9, 2018_
+
+    * Dependencies updated
+
+## v1.0.13 - _October 18, 2018_
+
+    * Make web3-provider-engine types a 'dependency' so it's available to users of the library (#1105)
+
+## v1.0.12 - _October 4, 2018_
+
+    * Dependencies updated
+
+## v1.0.11 - _September 28, 2018_
+
+    * Dependencies updated
+
+## v1.0.10 - _September 25, 2018_
+
+    * Dependencies updated
+
+## v1.0.9 - _September 25, 2018_
+
+    * Dependencies updated
+
+## v1.0.8 - _September 21, 2018_
+
+    * Dependencies updated
+
+## v1.0.7 - _September 5, 2018_
+
+    * Dependencies updated
+
+## v1.0.6 - _August 27, 2018_
+
+    * Dependencies updated
+
+## v1.0.5 - _August 24, 2018_
+
+    * Dependencies updated
+
+## v1.0.4 - _August 14, 2018_
 
     * Dependencies updated
 

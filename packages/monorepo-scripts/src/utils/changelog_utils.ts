@@ -19,18 +19,14 @@ CHANGELOG
 
 export const changelogUtils = {
     getChangelogMdTitle(versionChangelog: VersionChangelog): string {
-        if (_.isUndefined(versionChangelog.timestamp)) {
-            throw new Error(
-                'All CHANGELOG.json entries must be updated to include a timestamp before generating their MD version',
-            );
-        }
-        const date = moment(`${versionChangelog.timestamp}`, 'X').format('MMMM D, YYYY');
+        // Use UTC rather than the local machines time (formatted date time is +0:00)
+        const date = moment.utc(`${versionChangelog.timestamp}`, 'X').format('MMMM D, YYYY');
         const title = `\n## v${versionChangelog.version} - _${date}_\n\n`;
         return title;
     },
     getChangelogMdChange(change: Change): string {
         let line = `    * ${change.note}`;
-        if (!_.isUndefined(change.pr)) {
+        if (change.pr !== undefined) {
             line += ` (#${change.pr})`;
         }
         return line;
@@ -75,7 +71,7 @@ export const changelogUtils = {
     getChangelogOrCreateIfMissing(packageName: string, packageLocation: string): Changelog {
         const changelogJSONPath = path.join(packageLocation, 'CHANGELOG.json');
         let changelogJsonIfExists = changelogUtils.getChangelogJSONIfExists(changelogJSONPath);
-        if (_.isUndefined(changelogJsonIfExists)) {
+        if (changelogJsonIfExists === undefined) {
             // If none exists, create new, empty one.
             changelogJsonIfExists = '[]';
             fs.writeFileSync(changelogJSONPath, changelogJsonIfExists);

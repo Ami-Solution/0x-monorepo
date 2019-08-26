@@ -1,15 +1,15 @@
-import { BlockchainLifecycle, callbackErrorReporter } from '@0xproject/dev-utils';
-import { EmptyWalletSubprovider, Web3ProviderEngine } from '@0xproject/subproviders';
-import { DoneCallback } from '@0xproject/types';
-import { BigNumber } from '@0xproject/utils';
+import { BlockchainLifecycle, callbackErrorReporter } from '@0x/dev-utils';
+import { EmptyWalletSubprovider, Web3ProviderEngine } from '@0x/subproviders';
+import { DoneCallback } from '@0x/types';
+import { BigNumber, providerUtils } from '@0x/utils';
 import * as chai from 'chai';
-import { Provider } from 'ethereum-types';
 import 'mocha';
 
 import {
     BlockParamLiteral,
     BlockRange,
     ContractWrappers,
+    ContractWrappersConfig,
     ContractWrappersError,
     DecodedLogEvent,
     ERC721TokenApprovalEventArgs,
@@ -20,6 +20,7 @@ import {
 
 import { chaiSetup } from './utils/chai_setup';
 import { constants } from './utils/constants';
+import { migrateOnceAsync } from './utils/migrate';
 import { tokenUtils } from './utils/token_utils';
 import { provider, web3Wrapper } from './utils/web3_wrapper';
 
@@ -37,10 +38,15 @@ describe('ERC721Wrapper', () => {
     let operatorAddress: string;
     let approvedAddress: string;
     let receiverAddress: string;
-    const config = {
-        networkId: constants.TESTRPC_NETWORK_ID,
-    };
+    let config: ContractWrappersConfig;
+
     before(async () => {
+        const contractAddresses = await migrateOnceAsync();
+        config = {
+            networkId: constants.TESTRPC_NETWORK_ID,
+            contractAddresses,
+            blockPollingIntervalMs: 10,
+        };
         contractWrappers = new ContractWrappers(provider, config);
         userAddresses = await web3Wrapper.getAvailableAddressesAsync();
         tokens = tokenUtils.getDummyERC721TokenAddresses();
@@ -108,12 +114,6 @@ describe('ERC721Wrapper', () => {
                 tokenCount = await contractWrappers.erc721Token.getTokenCountAsync(tokenAddress, ownerAddress);
                 expect(tokenCount).to.be.bignumber.equal(1);
             });
-            it('should throw a CONTRACT_DOES_NOT_EXIST error for a non-existent token contract', async () => {
-                const nonExistentTokenAddress = '0x9dd402f14d67e001d8efbe6583e51bf9706aa065';
-                return expect(
-                    contractWrappers.erc721Token.getTokenCountAsync(nonExistentTokenAddress, ownerAddress),
-                ).to.be.rejectedWith(ContractWrappersError.ERC721TokenContractDoesNotExist);
-            });
             it('should return a balance of 0 for a non-existent owner address', async () => {
                 const nonExistentOwner = '0x198c6ad858f213fb31b6fe809e25040e6b964593';
                 const balance = await contractWrappers.erc721Token.getTokenCountAsync(tokenAddress, nonExistentOwner);
@@ -141,13 +141,6 @@ describe('ERC721Wrapper', () => {
             const tokenId = await tokenUtils.mintDummyERC721Async(tokenAddress, ownerAddress);
             const tokenOwner = await contractWrappers.erc721Token.getOwnerOfAsync(tokenAddress, tokenId);
             expect(tokenOwner).to.be.bignumber.equal(ownerAddress);
-        });
-        it('should throw a CONTRACT_DOES_NOT_EXIST error for a non-existent token contract', async () => {
-            const nonExistentTokenAddress = '0x9dd402f14d67e001d8efbe6583e51bf9706aa065';
-            const fakeTokenId = new BigNumber(42);
-            return expect(
-                contractWrappers.erc721Token.getOwnerOfAsync(nonExistentTokenAddress, fakeTokenId),
-            ).to.be.rejectedWith(ContractWrappersError.ERC721TokenContractDoesNotExist);
         });
         it('should return undefined not 0 for a non-existent ERC721', async () => {
             const fakeTokenId = new BigNumber(42);
@@ -229,11 +222,17 @@ describe('ERC721Wrapper', () => {
         it('should set the proxy approval', async () => {
             const tokenId = await tokenUtils.mintDummyERC721Async(tokenAddress, ownerAddress);
 
-            const approvalBeforeSet = await contractWrappers.erc721Token.isProxyApprovedAsync(tokenAddress, tokenId);
-            expect(approvalBeforeSet).to.be.false();
+            const isProxyApprovedBeforeSet = await contractWrappers.erc721Token.isProxyApprovedAsync(
+                tokenAddress,
+                tokenId,
+            );
+            expect(isProxyApprovedBeforeSet).to.be.false();
             await contractWrappers.erc721Token.setProxyApprovalAsync(tokenAddress, tokenId);
-            const approvalAfterSet = await contractWrappers.erc721Token.isProxyApprovedAsync(tokenAddress, tokenId);
-            expect(approvalAfterSet).to.be.true();
+            const isProxyApprovedAfterSet = await contractWrappers.erc721Token.isProxyApprovedAsync(
+                tokenAddress,
+                tokenId,
+            );
+            expect(isProxyApprovedAfterSet).to.be.true();
         });
     });
     describe('#subscribe', () => {
@@ -313,7 +312,7 @@ describe('ERC721Wrapper', () => {
                 );
             })().catch(done);
         });
-        it('Outstanding subscriptions are cancelled when contractWrappers.setProvider called', (done: DoneCallback) => {
+        it('Outstanding subscriptions are cancelled when contractWrappers.unsubscribeAll called', (done: DoneCallback) => {
             (async () => {
                 const callbackNeverToBeCalled = callbackErrorReporter.reportNodeCallbackErrors(done)(
                     (logEvent: DecodedLogEvent<ERC721TokenApprovalEventArgs>) => {
@@ -327,7 +326,7 @@ describe('ERC721Wrapper', () => {
                     callbackNeverToBeCalled,
                 );
                 const callbackToBeCalled = callbackErrorReporter.reportNodeCallbackErrors(done)();
-                contractWrappers.setProvider(provider, constants.TESTRPC_NETWORK_ID);
+                contractWrappers.unsubscribeAll();
                 contractWrappers.erc721Token.subscribe(
                     tokenAddress,
                     ERC721TokenEvents.Approval,
@@ -357,7 +356,6 @@ describe('ERC721Wrapper', () => {
                 );
                 contractWrappers.erc721Token.unsubscribe(subscriptionToken);
 
-                const tokenId = await tokenUtils.mintDummyERC721Async(tokenAddress, ownerAddress);
                 const isApproved = true;
                 await web3Wrapper.awaitTransactionSuccessAsync(
                     await contractWrappers.erc721Token.setApprovalForAllAsync(
@@ -373,15 +371,11 @@ describe('ERC721Wrapper', () => {
         });
     });
     describe('#getLogsAsync', () => {
-        let tokenTransferProxyAddress: string;
         const blockRange: BlockRange = {
             fromBlock: 0,
             toBlock: BlockParamLiteral.Latest,
         };
         let txHash: string;
-        before(() => {
-            tokenTransferProxyAddress = contractWrappers.erc721Proxy.getContractAddress();
-        });
         it('should get logs with decoded args emitted by ApprovalForAll', async () => {
             const isApprovedForAll = true;
             txHash = await contractWrappers.erc721Token.setApprovalForAllAsync(
@@ -459,13 +453,13 @@ describe('ERC721Wrapper', () => {
 });
 // tslint:disable:max-file-line-count
 
-function addEmptyWalletSubprovider(p: Provider): Provider {
+function addEmptyWalletSubprovider(p: Web3ProviderEngine): Web3ProviderEngine {
     const providerEngine = new Web3ProviderEngine();
     providerEngine.addProvider(new EmptyWalletSubprovider());
     const currentSubproviders = (p as any)._providers;
     for (const subprovider of currentSubproviders) {
         providerEngine.addProvider(subprovider);
     }
-    providerEngine.start();
+    providerUtils.startProviderEngine(providerEngine);
     return providerEngine;
 }

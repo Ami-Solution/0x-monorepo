@@ -1,3 +1,4 @@
+import changeCase = require('change-case');
 import isMobile = require('is-mobile');
 import * as _ from 'lodash';
 import { scroller } from 'react-scroll';
@@ -33,13 +34,16 @@ export const utils = {
     convertDashesToSpaces(text: string): string {
         return text.replace(/-/g, ' ');
     },
+    convertCamelCaseToSpaces(text: string): string {
+        return changeCase.snake(text).replace(/_/g, ' ');
+    },
     getEtherScanLinkIfExists(
         addressOrTxHash: string,
         networkId: number,
         suffix: EtherscanLinkSuffixes,
     ): string | undefined {
         const networkName = constants.NETWORK_NAME_BY_ID[networkId];
-        if (_.isUndefined(networkName)) {
+        if (networkName === undefined) {
             return undefined;
         }
         const etherScanPrefix = networkName === Networks.Mainnet ? '' : `${networkName.toLowerCase()}.`;

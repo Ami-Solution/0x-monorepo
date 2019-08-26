@@ -1,15 +1,27 @@
-import { schemas } from '@0xproject/json-schemas';
-import { assetDataUtils } from '@0xproject/order-utils';
-import { AssetProxyId, Order, SignedOrder } from '@0xproject/types';
-import { BigNumber } from '@0xproject/utils';
-import { Web3Wrapper } from '@0xproject/web3-wrapper';
-import { ContractAbi, LogWithDecodedArgs } from 'ethereum-types';
+import { ExchangeContract, ExchangeEventArgs, ExchangeEvents } from '@0x/abi-gen-wrappers';
+import { Exchange } from '@0x/contract-artifacts';
+import { schemas } from '@0x/json-schemas';
+import {
+    assetDataUtils,
+    BalanceAndProxyAllowanceLazyStore,
+    ExchangeTransferSimulator,
+    orderCalculationUtils,
+    orderHashUtils,
+    OrderStateUtils,
+    OrderValidationUtils,
+} from '@0x/order-utils';
+import { AssetProxyId, Order, SignedOrder } from '@0x/types';
+import { BigNumber } from '@0x/utils';
+import { Web3Wrapper } from '@0x/web3-wrapper';
+import { BlockParamLiteral, ContractAbi, LogWithDecodedArgs } from 'ethereum-types';
 import * as _ from 'lodash';
 
-import { artifacts } from '../artifacts';
+import { AssetBalanceAndProxyAllowanceFetcher } from '../fetchers/asset_balance_and_proxy_allowance_fetcher';
+import { OrderFilledCancelledFetcher } from '../fetchers/order_filled_cancelled_fetcher';
 import { methodOptsSchema } from '../schemas/method_opts_schema';
 import { orderTxOptsSchema } from '../schemas/order_tx_opts_schema';
 import { txOptsSchema } from '../schemas/tx_opts_schema';
+import { validateOrderFillableOptsSchema } from '../schemas/validate_order_fillable_opts_schema';
 import {
     BlockRange,
     EventCallback,
@@ -18,32 +30,56 @@ import {
     MethodOpts,
     OrderInfo,
     OrderTransactionOpts,
+    ValidateOrderFillableOpts,
 } from '../types';
 import { assert } from '../utils/assert';
+import { _getDefaultContractAddresses } from '../utils/contract_addresses';
 import { decorators } from '../utils/decorators';
+import { TransactionEncoder } from '../utils/transaction_encoder';
 
 import { ContractWrapper } from './contract_wrapper';
-import { ExchangeContract, ExchangeEventArgs, ExchangeEvents } from './generated/exchange';
+import { ERC20TokenWrapper } from './erc20_token_wrapper';
+import { ERC721TokenWrapper } from './erc721_token_wrapper';
 
 /**
  * This class includes all the functionality related to calling methods, sending transactions and subscribing to
  * events of the 0x V2 Exchange smart contract.
  */
 export class ExchangeWrapper extends ContractWrapper {
-    public abi: ContractAbi = artifacts.Exchange.compilerOutput.abi;
+    public abi: ContractAbi = Exchange.compilerOutput.abi;
+    public address: string;
+    public zrxTokenAddress: string;
     private _exchangeContractIfExists?: ExchangeContract;
-    private _contractAddressIfExists?: string;
-    private _zrxContractAddressIfExists?: string;
+    private readonly _erc721TokenWrapper: ERC721TokenWrapper;
+    private readonly _erc20TokenWrapper: ERC20TokenWrapper;
+    /**
+     * Instantiate ExchangeWrapper
+     * @param web3Wrapper Web3Wrapper instance to use.
+     * @param networkId Desired networkId.
+     * @param erc20TokenWrapper ERC20TokenWrapper instance to use.
+     * @param erc721TokenWrapper ERC721TokenWrapper instance to use.
+     * @param address The address of the Exchange contract. If undefined, will
+     * default to the known address corresponding to the networkId.
+     * @param zrxTokenAddress The address of the ZRXToken contract. If
+     * undefined, will default to the known address corresponding to the
+     * networkId.
+     * @param blockPollingIntervalMs The block polling interval to use for active subscriptions.
+     */
     constructor(
         web3Wrapper: Web3Wrapper,
         networkId: number,
-        contractAddressIfExists?: string,
-        zrxContractAddressIfExists?: string,
+        erc20TokenWrapper: ERC20TokenWrapper,
+        erc721TokenWrapper: ERC721TokenWrapper,
+        address?: string,
+        zrxTokenAddress?: string,
         blockPollingIntervalMs?: number,
     ) {
         super(web3Wrapper, networkId, blockPollingIntervalMs);
-        this._contractAddressIfExists = contractAddressIfExists;
-        this._zrxContractAddressIfExists = zrxContractAddressIfExists;
+        this._erc20TokenWrapper = erc20TokenWrapper;
+        this._erc721TokenWrapper = erc721TokenWrapper;
+        this.address = address === undefined ? _getDefaultContractAddresses(networkId).exchange : address;
+        this.zrxTokenAddress =
+            zrxTokenAddress === undefined ? _getDefaultContractAddresses(networkId).zrxToken : zrxTokenAddress;
     }
     /**
      * Retrieve the address of an asset proxy by signature.
@@ -56,8 +92,8 @@ export class ExchangeWrapper extends ContractWrapper {
         assert.doesConformToSchema('methodOpts', methodOpts, methodOptsSchema);
         const exchangeContract = await this._getExchangeContractAsync();
 
-        const txData = {};
-        const assetProxy = await exchangeContract.getAssetProxy.callAsync(proxyId, txData, methodOpts.defaultBlock);
+        const callData = {};
+        const assetProxy = await exchangeContract.getAssetProxy.callAsync(proxyId, callData, methodOpts.defaultBlock);
         return assetProxy;
     }
     /**
@@ -71,10 +107,10 @@ export class ExchangeWrapper extends ContractWrapper {
         assert.doesConformToSchema('methodOpts', methodOpts, methodOptsSchema);
         const exchangeContract = await this._getExchangeContractAsync();
 
-        const txData = {};
+        const callData = {};
         const filledTakerAssetAmountInBaseUnits = await exchangeContract.filled.callAsync(
             orderHash,
-            txData,
+            callData,
             methodOpts.defaultBlock,
         );
         return filledTakerAssetAmountInBaseUnits;
@@ -88,8 +124,8 @@ export class ExchangeWrapper extends ContractWrapper {
         assert.doesConformToSchema('methodOpts', methodOpts, methodOptsSchema);
         const exchangeContract = await this._getExchangeContractAsync();
 
-        const txData = {};
-        const version = await exchangeContract.VERSION.callAsync(txData, methodOpts.defaultBlock);
+        const callData = {};
+        const version = await exchangeContract.VERSION.callAsync(callData, methodOpts.defaultBlock);
         return version;
     }
     /**
@@ -110,11 +146,11 @@ export class ExchangeWrapper extends ContractWrapper {
         assert.doesConformToSchema('methodOpts', methodOpts, methodOptsSchema);
         const exchangeContract = await this._getExchangeContractAsync();
 
-        const txData = {};
+        const callData = {};
         const orderEpoch = await exchangeContract.orderEpoch.callAsync(
             makerAddress,
             senderAddress,
-            txData,
+            callData,
             methodOpts.defaultBlock,
         );
         return orderEpoch;
@@ -130,8 +166,8 @@ export class ExchangeWrapper extends ContractWrapper {
         assert.doesConformToSchema('methodOpts', methodOpts, methodOptsSchema);
         const exchangeContract = await this._getExchangeContractAsync();
 
-        const txData = {};
-        const isCancelled = await exchangeContract.cancelled.callAsync(orderHash, txData, methodOpts.defaultBlock);
+        const callData = {};
+        const isCancelled = await exchangeContract.cancelled.callAsync(orderHash, callData, methodOpts.defaultBlock);
         return isCancelled;
     }
     /**
@@ -162,6 +198,7 @@ export class ExchangeWrapper extends ContractWrapper {
                 from: normalizedTakerAddress,
                 gas: orderTransactionOpts.gasLimit,
                 gasPrice: orderTransactionOpts.gasPrice,
+                nonce: orderTransactionOpts.nonce,
             });
         }
 
@@ -173,6 +210,7 @@ export class ExchangeWrapper extends ContractWrapper {
                 from: normalizedTakerAddress,
                 gas: orderTransactionOpts.gasLimit,
                 gasPrice: orderTransactionOpts.gasPrice,
+                nonce: orderTransactionOpts.nonce,
             },
         );
         return txHash;
@@ -209,6 +247,7 @@ export class ExchangeWrapper extends ContractWrapper {
                     from: normalizedTakerAddress,
                     gas: orderTransactionOpts.gasLimit,
                     gasPrice: orderTransactionOpts.gasPrice,
+                    nonce: orderTransactionOpts.nonce,
                 },
             );
         }
@@ -220,6 +259,7 @@ export class ExchangeWrapper extends ContractWrapper {
                 from: normalizedTakerAddress,
                 gas: orderTransactionOpts.gasLimit,
                 gasPrice: orderTransactionOpts.gasPrice,
+                nonce: orderTransactionOpts.nonce,
             },
         );
         return txHash;
@@ -253,6 +293,7 @@ export class ExchangeWrapper extends ContractWrapper {
                 from: normalizedTakerAddress,
                 gas: orderTransactionOpts.gasLimit,
                 gasPrice: orderTransactionOpts.gasPrice,
+                nonce: orderTransactionOpts.nonce,
             });
         }
         const txHash = await exchangeInstance.fillOrKillOrder.sendTransactionAsync(
@@ -263,6 +304,7 @@ export class ExchangeWrapper extends ContractWrapper {
                 from: normalizedTakerAddress,
                 gas: orderTransactionOpts.gasLimit,
                 gasPrice: orderTransactionOpts.gasPrice,
+                nonce: orderTransactionOpts.nonce,
             },
         );
         return txHash;
@@ -302,6 +344,7 @@ export class ExchangeWrapper extends ContractWrapper {
                 from: normalizedSenderAddress,
                 gas: orderTransactionOpts.gasLimit,
                 gasPrice: orderTransactionOpts.gasPrice,
+                nonce: orderTransactionOpts.nonce,
             });
         }
         const txHash = await exchangeInstance.executeTransaction.sendTransactionAsync(
@@ -313,6 +356,7 @@ export class ExchangeWrapper extends ContractWrapper {
                 from: normalizedSenderAddress,
                 gas: orderTransactionOpts.gasLimit,
                 gasPrice: orderTransactionOpts.gasPrice,
+                nonce: orderTransactionOpts.nonce,
             },
         );
         return txHash;
@@ -348,6 +392,7 @@ export class ExchangeWrapper extends ContractWrapper {
                 from: normalizedTakerAddress,
                 gas: orderTransactionOpts.gasLimit,
                 gasPrice: orderTransactionOpts.gasPrice,
+                nonce: orderTransactionOpts.nonce,
             });
         }
         const txHash = await exchangeInstance.batchFillOrders.sendTransactionAsync(
@@ -358,6 +403,7 @@ export class ExchangeWrapper extends ContractWrapper {
                 from: normalizedTakerAddress,
                 gas: orderTransactionOpts.gasLimit,
                 gasPrice: orderTransactionOpts.gasPrice,
+                nonce: orderTransactionOpts.nonce,
             },
         );
         return txHash;
@@ -391,6 +437,7 @@ export class ExchangeWrapper extends ContractWrapper {
                 from: normalizedTakerAddress,
                 gas: orderTransactionOpts.gasLimit,
                 gasPrice: orderTransactionOpts.gasPrice,
+                nonce: orderTransactionOpts.nonce,
             });
         }
         const txHash = await exchangeInstance.marketBuyOrders.sendTransactionAsync(
@@ -401,6 +448,7 @@ export class ExchangeWrapper extends ContractWrapper {
                 from: normalizedTakerAddress,
                 gas: orderTransactionOpts.gasLimit,
                 gasPrice: orderTransactionOpts.gasPrice,
+                nonce: orderTransactionOpts.nonce,
             },
         );
         return txHash;
@@ -434,6 +482,7 @@ export class ExchangeWrapper extends ContractWrapper {
                 from: normalizedTakerAddress,
                 gas: orderTransactionOpts.gasLimit,
                 gasPrice: orderTransactionOpts.gasPrice,
+                nonce: orderTransactionOpts.nonce,
             });
         }
         const txHash = await exchangeInstance.marketSellOrders.sendTransactionAsync(
@@ -444,6 +493,7 @@ export class ExchangeWrapper extends ContractWrapper {
                 from: normalizedTakerAddress,
                 gas: orderTransactionOpts.gasLimit,
                 gasPrice: orderTransactionOpts.gasPrice,
+                nonce: orderTransactionOpts.nonce,
             },
         );
         return txHash;
@@ -477,6 +527,7 @@ export class ExchangeWrapper extends ContractWrapper {
                 from: normalizedTakerAddress,
                 gas: orderTransactionOpts.gasLimit,
                 gasPrice: orderTransactionOpts.gasPrice,
+                nonce: orderTransactionOpts.nonce,
             });
         }
         const txHash = await exchangeInstance.marketBuyOrdersNoThrow.sendTransactionAsync(
@@ -487,6 +538,7 @@ export class ExchangeWrapper extends ContractWrapper {
                 from: normalizedTakerAddress,
                 gas: orderTransactionOpts.gasLimit,
                 gasPrice: orderTransactionOpts.gasPrice,
+                nonce: orderTransactionOpts.nonce,
             },
         );
         return txHash;
@@ -520,6 +572,7 @@ export class ExchangeWrapper extends ContractWrapper {
                 from: normalizedTakerAddress,
                 gas: orderTransactionOpts.gasLimit,
                 gasPrice: orderTransactionOpts.gasPrice,
+                nonce: orderTransactionOpts.nonce,
             });
         }
         const txHash = await exchangeInstance.marketSellOrdersNoThrow.sendTransactionAsync(
@@ -530,6 +583,7 @@ export class ExchangeWrapper extends ContractWrapper {
                 from: normalizedTakerAddress,
                 gas: orderTransactionOpts.gasLimit,
                 gasPrice: orderTransactionOpts.gasPrice,
+                nonce: orderTransactionOpts.nonce,
             },
         );
         return txHash;
@@ -565,6 +619,7 @@ export class ExchangeWrapper extends ContractWrapper {
                 from: normalizedTakerAddress,
                 gas: orderTransactionOpts.gasLimit,
                 gasPrice: orderTransactionOpts.gasPrice,
+                nonce: orderTransactionOpts.nonce,
             });
         }
         const txHash = await exchangeInstance.batchFillOrdersNoThrow.sendTransactionAsync(
@@ -575,6 +630,7 @@ export class ExchangeWrapper extends ContractWrapper {
                 from: normalizedTakerAddress,
                 gas: orderTransactionOpts.gasLimit,
                 gasPrice: orderTransactionOpts.gasPrice,
+                nonce: orderTransactionOpts.nonce,
             },
         );
         return txHash;
@@ -610,6 +666,7 @@ export class ExchangeWrapper extends ContractWrapper {
                 from: normalizedTakerAddress,
                 gas: orderTransactionOpts.gasLimit,
                 gasPrice: orderTransactionOpts.gasPrice,
+                nonce: orderTransactionOpts.nonce,
             });
         }
         const txHash = await exchangeInstance.batchFillOrKillOrders.sendTransactionAsync(
@@ -620,6 +677,7 @@ export class ExchangeWrapper extends ContractWrapper {
                 from: normalizedTakerAddress,
                 gas: orderTransactionOpts.gasLimit,
                 gasPrice: orderTransactionOpts.gasPrice,
+                nonce: orderTransactionOpts.nonce,
             },
         );
         return txHash;
@@ -648,12 +706,14 @@ export class ExchangeWrapper extends ContractWrapper {
                 from: normalizedMakerAddress,
                 gas: orderTransactionOpts.gasLimit,
                 gasPrice: orderTransactionOpts.gasPrice,
+                nonce: orderTransactionOpts.nonce,
             });
         }
         const txHash = await exchangeInstance.batchCancelOrders.sendTransactionAsync(orders, {
             from: normalizedMakerAddress,
             gas: orderTransactionOpts.gasLimit,
             gasPrice: orderTransactionOpts.gasPrice,
+            nonce: orderTransactionOpts.nonce,
         });
         return txHash;
     }
@@ -665,6 +725,7 @@ export class ExchangeWrapper extends ContractWrapper {
      * @param leftSignedOrder  First order to match.
      * @param rightSignedOrder Second order to match.
      * @param takerAddress     The address that sends the transaction and gets the spread.
+     * @param orderTransactionOpts Optional arguments this method accepts.
      * @return Transaction hash.
      */
     @decorators.asyncZeroExErrorHandler
@@ -684,10 +745,6 @@ export class ExchangeWrapper extends ContractWrapper {
             rightSignedOrder.takerAssetData !== leftSignedOrder.makerAssetData
         ) {
             throw new Error(ExchangeWrapperError.AssetDataMismatch);
-        } else {
-            // Smart contracts assigns the asset data from the left order to the right one so we can save gas on reducing the size of call data
-            rightSignedOrder.makerAssetData = '0x';
-            rightSignedOrder.takerAssetData = '0x';
         }
         const exchangeInstance = await this._getExchangeContractAsync();
         if (orderTransactionOpts.shouldValidate) {
@@ -700,6 +757,7 @@ export class ExchangeWrapper extends ContractWrapper {
                     from: normalizedTakerAddress,
                     gas: orderTransactionOpts.gasLimit,
                     gasPrice: orderTransactionOpts.gasPrice,
+                    nonce: orderTransactionOpts.nonce,
                 },
             );
         }
@@ -712,6 +770,7 @@ export class ExchangeWrapper extends ContractWrapper {
                 from: normalizedTakerAddress,
                 gas: orderTransactionOpts.gasLimit,
                 gasPrice: orderTransactionOpts.gasPrice,
+                nonce: orderTransactionOpts.nonce,
             },
         );
         return txHash;
@@ -723,6 +782,7 @@ export class ExchangeWrapper extends ContractWrapper {
      * @param signerAddress Address that should have signed the given hash.
      * @param signature     Proof that the hash has been signed by signer.
      * @param senderAddress Address that should send the transaction.
+     * @param orderTransactionOpts Optional arguments this method accepts.
      * @returns Transaction hash.
      */
     @decorators.asyncZeroExErrorHandler
@@ -745,12 +805,14 @@ export class ExchangeWrapper extends ContractWrapper {
                 from: normalizedTakerAddress,
                 gas: orderTransactionOpts.gasLimit,
                 gasPrice: orderTransactionOpts.gasPrice,
+                nonce: orderTransactionOpts.nonce,
             });
         }
         const txHash = await exchangeInstance.preSign.sendTransactionAsync(hash, signerAddress, signature, {
             from: normalizedTakerAddress,
             gas: orderTransactionOpts.gasLimit,
             gasPrice: orderTransactionOpts.gasPrice,
+            nonce: orderTransactionOpts.nonce,
         });
         return txHash;
     }
@@ -774,12 +836,12 @@ export class ExchangeWrapper extends ContractWrapper {
         assert.isHexString('signature', signature);
         assert.doesConformToSchema('methodOpts', methodOpts, methodOptsSchema);
         const exchangeInstance = await this._getExchangeContractAsync();
-        const txData = {};
+        const callData = {};
         const isValidSignature = await exchangeInstance.isValidSignature.callAsync(
             hash,
             signerAddress,
             signature,
-            txData,
+            callData,
             methodOpts.defaultBlock,
         );
         return isValidSignature;
@@ -799,17 +861,17 @@ export class ExchangeWrapper extends ContractWrapper {
     ): Promise<boolean> {
         assert.isETHAddressHex('signerAddress', signerAddress);
         assert.isETHAddressHex('validatorAddress', validatorAddress);
-        if (!_.isUndefined(methodOpts)) {
+        if (methodOpts !== undefined) {
             assert.doesConformToSchema('methodOpts', methodOpts, methodOptsSchema);
         }
         const normalizedSignerAddress = signerAddress.toLowerCase();
         const normalizedValidatorAddress = validatorAddress.toLowerCase();
         const exchangeInstance = await this._getExchangeContractAsync();
-        const txData = {};
+        const callData = {};
         const isValidSignature = await exchangeInstance.allowedValidators.callAsync(
             normalizedSignerAddress,
             normalizedValidatorAddress,
-            txData,
+            callData,
             methodOpts.defaultBlock,
         );
         return isValidSignature;
@@ -825,16 +887,16 @@ export class ExchangeWrapper extends ContractWrapper {
     public async isPreSignedAsync(hash: string, signerAddress: string, methodOpts: MethodOpts = {}): Promise<boolean> {
         assert.isHexString('hash', hash);
         assert.isETHAddressHex('signerAddress', signerAddress);
-        if (!_.isUndefined(methodOpts)) {
+        if (methodOpts !== undefined) {
             assert.doesConformToSchema('methodOpts', methodOpts, methodOptsSchema);
         }
         const exchangeInstance = await this._getExchangeContractAsync();
 
-        const txData = {};
+        const callData = {};
         const isPreSigned = await exchangeInstance.preSigned.callAsync(
             hash,
             signerAddress,
-            txData,
+            callData,
             methodOpts.defaultBlock,
         );
         return isPreSigned;
@@ -849,14 +911,14 @@ export class ExchangeWrapper extends ContractWrapper {
     @decorators.asyncZeroExErrorHandler
     public async isTransactionExecutedAsync(transactionHash: string, methodOpts: MethodOpts = {}): Promise<boolean> {
         assert.isHexString('transactionHash', transactionHash);
-        if (!_.isUndefined(methodOpts)) {
+        if (methodOpts !== undefined) {
             assert.doesConformToSchema('methodOpts', methodOpts, methodOptsSchema);
         }
         const exchangeInstance = await this._getExchangeContractAsync();
-        const txData = {};
+        const callData = {};
         const isExecuted = await exchangeInstance.transactions.callAsync(
             transactionHash,
-            txData,
+            callData,
             methodOpts.defaultBlock,
         );
         return isExecuted;
@@ -870,12 +932,12 @@ export class ExchangeWrapper extends ContractWrapper {
     @decorators.asyncZeroExErrorHandler
     public async getOrderInfoAsync(order: Order | SignedOrder, methodOpts: MethodOpts = {}): Promise<OrderInfo> {
         assert.doesConformToSchema('order', order, schemas.orderSchema);
-        if (!_.isUndefined(methodOpts)) {
+        if (methodOpts !== undefined) {
             assert.doesConformToSchema('methodOpts', methodOpts, methodOptsSchema);
         }
         const exchangeInstance = await this._getExchangeContractAsync();
-        const txData = {};
-        const orderInfo = await exchangeInstance.getOrderInfo.callAsync(order, txData, methodOpts.defaultBlock);
+        const callData = {};
+        const orderInfo = await exchangeInstance.getOrderInfo.callAsync(order, callData, methodOpts.defaultBlock);
         return orderInfo;
     }
     /**
@@ -890,18 +952,18 @@ export class ExchangeWrapper extends ContractWrapper {
         methodOpts: MethodOpts = {},
     ): Promise<OrderInfo[]> {
         assert.doesConformToSchema('orders', orders, schemas.ordersSchema);
-        if (!_.isUndefined(methodOpts)) {
+        if (methodOpts !== undefined) {
             assert.doesConformToSchema('methodOpts', methodOpts, methodOptsSchema);
         }
         const exchangeInstance = await this._getExchangeContractAsync();
-        const txData = {};
-        const ordersInfo = await exchangeInstance.getOrdersInfo.callAsync(orders, txData, methodOpts.defaultBlock);
+        const callData = {};
+        const ordersInfo = await exchangeInstance.getOrdersInfo.callAsync(orders, callData, methodOpts.defaultBlock);
         return ordersInfo;
     }
     /**
      * Cancel a given order.
      * @param   order           An object that conforms to the Order or SignedOrder interface. The order you would like to cancel.
-     * @param   transactionOpts Optional arguments this method accepts.
+     * @param   orderTransactionOpts Optional arguments this method accepts.
      * @return  Transaction hash.
      */
     @decorators.asyncZeroExErrorHandler
@@ -920,12 +982,14 @@ export class ExchangeWrapper extends ContractWrapper {
                 from: normalizedMakerAddress,
                 gas: orderTransactionOpts.gasLimit,
                 gasPrice: orderTransactionOpts.gasPrice,
+                nonce: orderTransactionOpts.nonce,
             });
         }
         const txHash = await exchangeInstance.cancelOrder.sendTransactionAsync(order, {
             from: normalizedMakerAddress,
             gas: orderTransactionOpts.gasLimit,
             gasPrice: orderTransactionOpts.gasPrice,
+            nonce: orderTransactionOpts.nonce,
         });
         return txHash;
     }
@@ -956,6 +1020,7 @@ export class ExchangeWrapper extends ContractWrapper {
                 from: normalizedSenderAddress,
                 gas: orderTransactionOpts.gasLimit,
                 gasPrice: orderTransactionOpts.gasPrice,
+                nonce: orderTransactionOpts.nonce,
             });
         }
         const txHash = await exchangeInstance.setSignatureValidatorApproval.sendTransactionAsync(
@@ -965,6 +1030,7 @@ export class ExchangeWrapper extends ContractWrapper {
                 from: normalizedSenderAddress,
                 gas: orderTransactionOpts.gasLimit,
                 gasPrice: orderTransactionOpts.gasPrice,
+                nonce: orderTransactionOpts.nonce,
             },
         );
         return txHash;
@@ -994,12 +1060,14 @@ export class ExchangeWrapper extends ContractWrapper {
                 from: normalizedSenderAddress,
                 gas: orderTransactionOpts.gasLimit,
                 gasPrice: orderTransactionOpts.gasPrice,
+                nonce: orderTransactionOpts.nonce,
             });
         }
         const txHash = await exchangeInstance.cancelOrdersUpTo.sendTransactionAsync(targetOrderEpoch, {
             from: normalizedSenderAddress,
             gas: orderTransactionOpts.gasLimit,
             gasPrice: orderTransactionOpts.gasPrice,
+            nonce: orderTransactionOpts.nonce,
         });
         return txHash;
     }
@@ -1021,12 +1089,11 @@ export class ExchangeWrapper extends ContractWrapper {
         assert.doesBelongToStringEnum('eventName', eventName, ExchangeEvents);
         assert.doesConformToSchema('indexFilterValues', indexFilterValues, schemas.indexFilterValuesSchema);
         assert.isFunction('callback', callback);
-        const exchangeContractAddress = this.getContractAddress();
         const subscriptionToken = this._subscribe<ArgsType>(
-            exchangeContractAddress,
+            this.address,
             eventName,
             indexFilterValues,
-            artifacts.Exchange.compilerOutput.abi,
+            Exchange.compilerOutput.abi,
             callback,
             isVerbose,
         );
@@ -1061,59 +1128,149 @@ export class ExchangeWrapper extends ContractWrapper {
         assert.doesBelongToStringEnum('eventName', eventName, ExchangeEvents);
         assert.doesConformToSchema('blockRange', blockRange, schemas.blockRangeSchema);
         assert.doesConformToSchema('indexFilterValues', indexFilterValues, schemas.indexFilterValuesSchema);
-        const exchangeContractAddress = this.getContractAddress();
         const logs = await this._getLogsAsync<ArgsType>(
-            exchangeContractAddress,
+            this.address,
             eventName,
             blockRange,
             indexFilterValues,
-            artifacts.Exchange.compilerOutput.abi,
+            Exchange.compilerOutput.abi,
         );
         return logs;
     }
     /**
-     * Retrieves the Ethereum address of the Exchange contract deployed on the network
-     * that the user-passed web3 provider is connected to.
-     * @returns The Ethereum address of the Exchange contract being used.
+     * Validate if the supplied order is fillable, and throw if it isn't
+     * @param signedOrder SignedOrder of interest
+     * @param opts ValidateOrderFillableOpts options (e.g expectedFillTakerTokenAmount.
+     * If it isn't supplied, we check if the order is fillable for the remaining amount.
+     * To check if the order is fillable for a non-zero amount, set `validateRemainingOrderAmountIsFillable` to false.)
      */
-    public getContractAddress(): string {
-        const contractAddress = this._getContractAddress(artifacts.Exchange, this._contractAddressIfExists);
-        return contractAddress;
+    public async validateOrderFillableOrThrowAsync(
+        signedOrder: SignedOrder,
+        opts: ValidateOrderFillableOpts = {},
+    ): Promise<void> {
+        assert.doesConformToSchema('signedOrder', signedOrder, schemas.signedOrderSchema);
+        assert.doesConformToSchema('opts', opts, validateOrderFillableOptsSchema);
+
+        const balanceAllowanceFetcher = new AssetBalanceAndProxyAllowanceFetcher(
+            this._erc20TokenWrapper,
+            this._erc721TokenWrapper,
+            BlockParamLiteral.Latest,
+        );
+        const balanceAllowanceStore = new BalanceAndProxyAllowanceLazyStore(balanceAllowanceFetcher);
+        const exchangeTradeSimulator = new ExchangeTransferSimulator(balanceAllowanceStore);
+        const filledCancelledFetcher = new OrderFilledCancelledFetcher(this, BlockParamLiteral.Latest);
+
+        let fillableTakerAssetAmount;
+        const shouldValidateRemainingOrderAmountIsFillable =
+            opts.validateRemainingOrderAmountIsFillable === undefined
+                ? true
+                : opts.validateRemainingOrderAmountIsFillable;
+        if (opts.expectedFillTakerTokenAmount) {
+            // If the caller has specified a taker fill amount, we use this for all validation
+            fillableTakerAssetAmount = opts.expectedFillTakerTokenAmount;
+        } else if (shouldValidateRemainingOrderAmountIsFillable) {
+            // Default behaviour is to validate the amount left on the order.
+            const filledTakerTokenAmount = await this.getFilledTakerAssetAmountAsync(
+                orderHashUtils.getOrderHashHex(signedOrder),
+            );
+            fillableTakerAssetAmount = signedOrder.takerAssetAmount.minus(filledTakerTokenAmount);
+        } else {
+            const orderStateUtils = new OrderStateUtils(balanceAllowanceStore, filledCancelledFetcher);
+            // Calculate the taker amount fillable given the maker balance and allowance
+            const orderRelevantState = await orderStateUtils.getOpenOrderRelevantStateAsync(signedOrder);
+            fillableTakerAssetAmount = orderRelevantState.remainingFillableTakerAssetAmount;
+        }
+
+        const orderValidationUtils = new OrderValidationUtils(filledCancelledFetcher, this._web3Wrapper.getProvider());
+        await orderValidationUtils.validateOrderFillableOrThrowAsync(
+            exchangeTradeSimulator,
+            signedOrder,
+            this.getZRXAssetData(),
+            fillableTakerAssetAmount,
+        );
+        const makerTransferAmount = orderCalculationUtils.getMakerFillAmount(signedOrder, fillableTakerAssetAmount);
+        await this.validateMakerTransferThrowIfInvalidAsync(
+            signedOrder,
+            makerTransferAmount,
+            opts.simulationTakerAddress,
+        );
     }
     /**
-     * Returns the ZRX token address used by the exchange contract.
-     * @return Address of ZRX token
+     * Validate the transfer from the maker to the taker. This is simulated on-chain
+     * via an eth_call. If this call fails, the asset is currently nontransferable.
+     * @param signedOrder SignedOrder of interest
+     * @param makerAssetAmount Amount to transfer from the maker
+     * @param takerAddress The address to transfer to, defaults to signedOrder.takerAddress
      */
-    public getZRXTokenAddress(): string {
-        const contractAddress = this._getContractAddress(artifacts.ZRXToken, this._zrxContractAddressIfExists);
-        return contractAddress;
+    public async validateMakerTransferThrowIfInvalidAsync(
+        signedOrder: SignedOrder,
+        makerAssetAmount: BigNumber,
+        takerAddress?: string,
+    ): Promise<void> {
+        const networkId = await this._web3Wrapper.getNetworkIdAsync();
+        await OrderValidationUtils.validateMakerTransferThrowIfInvalidAsync(
+            networkId,
+            this._web3Wrapper.getProvider(),
+            signedOrder,
+            makerAssetAmount,
+            takerAddress,
+        );
+    }
+    /**
+     * Validate a call to FillOrder and throw if it wouldn't succeed
+     * @param signedOrder SignedOrder of interest
+     * @param fillTakerAssetAmount Amount we'd like to fill the order for
+     * @param takerAddress The taker of the order
+     */
+    public async validateFillOrderThrowIfInvalidAsync(
+        signedOrder: SignedOrder,
+        fillTakerAssetAmount: BigNumber,
+        takerAddress: string,
+    ): Promise<void> {
+        const balanceAllowanceFetcher = new AssetBalanceAndProxyAllowanceFetcher(
+            this._erc20TokenWrapper,
+            this._erc721TokenWrapper,
+            BlockParamLiteral.Latest,
+        );
+        const balanceAllowanceStore = new BalanceAndProxyAllowanceLazyStore(balanceAllowanceFetcher);
+        const exchangeTradeSimulator = new ExchangeTransferSimulator(balanceAllowanceStore);
+
+        const filledCancelledFetcher = new OrderFilledCancelledFetcher(this, BlockParamLiteral.Latest);
+        const orderValidationUtils = new OrderValidationUtils(filledCancelledFetcher, this._web3Wrapper.getProvider());
+        await orderValidationUtils.validateFillOrderThrowIfInvalidAsync(
+            exchangeTradeSimulator,
+            this._web3Wrapper.getProvider(),
+            signedOrder,
+            fillTakerAssetAmount,
+            takerAddress,
+            this.getZRXAssetData(),
+        );
     }
     /**
      * Returns the ZRX asset data used by the exchange contract.
      * @return ZRX asset data
      */
     public getZRXAssetData(): string {
-        const zrxTokenAddress = this.getZRXTokenAddress();
-        const zrxAssetData = assetDataUtils.encodeERC20AssetData(zrxTokenAddress);
+        const zrxAssetData = assetDataUtils.encodeERC20AssetData(this.zrxTokenAddress);
         return zrxAssetData;
     }
-    // tslint:disable:no-unused-variable
-    private _invalidateContractInstances(): void {
-        this.unsubscribeAll();
-        delete this._exchangeContractIfExists;
+    /**
+     * Returns a Transaction Encoder. Transaction messages exist for the purpose of calling methods on the Exchange contract
+     * in the context of another address.
+     * @return TransactionEncoder
+     */
+    public async transactionEncoderAsync(): Promise<TransactionEncoder> {
+        const exchangeInstance = await this._getExchangeContractAsync();
+        const encoder = new TransactionEncoder(exchangeInstance);
+        return encoder;
     }
     // tslint:enable:no-unused-variable
     private async _getExchangeContractAsync(): Promise<ExchangeContract> {
-        if (!_.isUndefined(this._exchangeContractIfExists)) {
+        if (this._exchangeContractIfExists !== undefined) {
             return this._exchangeContractIfExists;
         }
-        const [abi, address] = await this._getContractAbiAndAddressFromArtifactsAsync(
-            artifacts.Exchange,
-            this._contractAddressIfExists,
-        );
         const contractInstance = new ExchangeContract(
-            abi,
-            address,
+            this.address,
             this._web3Wrapper.getProvider(),
             this._web3Wrapper.getContractDefaults(),
         );

@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 
-import { abiUtils, logUtils } from '@0xproject/utils';
+import { AbiEncoder, abiUtils, logUtils } from '@0x/utils';
 import chalk from 'chalk';
-import { AbiDefinition, ConstructorAbi, EventAbi, MethodAbi } from 'ethereum-types';
+import * as changeCase from 'change-case';
+import * as cliFormat from 'cli-format';
+import { AbiDefinition, ConstructorAbi, ContractAbi, DevdocOutput, EventAbi, MethodAbi } from 'ethereum-types';
 import { sync as globSync } from 'glob';
 import * as Handlebars from 'handlebars';
 import * as _ from 'lodash';
@@ -43,7 +45,7 @@ const args = yargs
         normalize: true,
     })
     .option('backend', {
-        describe: `The backing Ethereum library your app uses. Either 'web3' or 'ethers'. Ethers auto-converts small ints to numbers whereas Web3 doesn't.`,
+        describe: `The backing Ethereum library your app uses. For TypeScript, either 'web3' or 'ethers'. Ethers auto-converts small ints to numbers whereas Web3 doesn't. For Python, the only possibility is Web3.py`,
         type: 'string',
         choices: [ContractsBackend.Web3, ContractsBackend.Ethers],
         default: DEFAULT_BACKEND,
@@ -53,13 +55,23 @@ const args = yargs
         type: 'number',
         default: DEFAULT_NETWORK_ID,
     })
+    .option('language', {
+        describe: 'Language of output file to generate',
+        type: 'string',
+        choices: ['TypeScript', 'Python'],
+        default: 'TypeScript',
+    })
     .example(
         "$0 --abis 'src/artifacts/**/*.json' --out 'src/contracts/generated/' --partials 'src/templates/partials/**/*.handlebars' --template 'src/templates/contract.handlebars'",
         'Full usage example',
     ).argv;
 
-function registerPartials(partialsGlob: string): void {
-    const partialTemplateFileNames = globSync(partialsGlob);
+const mainTemplate = utils.getNamedContent(args.template);
+const template = Handlebars.compile<ContextData>(mainTemplate.content);
+const abiFileNames = globSync(args.abis);
+const partialTemplateFileNames = globSync(args.partials);
+
+function registerPartials(): void {
     logUtils.log(`Found ${chalk.green(`${partialTemplateFileNames.length}`)} ${chalk.bold('partial')} templates`);
     for (const partialTemplateFileName of partialTemplateFileNames) {
         const namedContent = utils.getNamedContent(partialTemplateFileName);
@@ -67,14 +79,56 @@ function registerPartials(partialsGlob: string): void {
     }
 }
 
-Handlebars.registerHelper('parameterType', utils.solTypeToTsType.bind(utils, ParamKind.Input, args.backend));
-Handlebars.registerHelper('returnType', utils.solTypeToTsType.bind(utils, ParamKind.Output, args.backend));
-if (args.partials) {
-    registerPartials(args.partials);
+function registerTypeScriptHelpers(): void {
+    Handlebars.registerHelper('parameterType', utils.solTypeToTsType.bind(utils, ParamKind.Input, args.backend));
+    Handlebars.registerHelper('assertionType', utils.solTypeToAssertion.bind(utils));
+    Handlebars.registerHelper('returnType', utils.solTypeToTsType.bind(utils, ParamKind.Output, args.backend));
+
+    // Check if 0 or false exists
+    Handlebars.registerHelper(
+        'isDefined',
+        (context: any): boolean => {
+            return context !== undefined;
+        },
+    );
 }
-const mainTemplate = utils.getNamedContent(args.template);
-const template = Handlebars.compile<ContextData>(mainTemplate.content);
-const abiFileNames = globSync(args.abis);
+
+function registerPythonHelpers(): void {
+    Handlebars.registerHelper('equal', (lhs, rhs, options) => {
+        return lhs === rhs;
+    });
+    Handlebars.registerHelper('safeString', (str, options) => new Handlebars.SafeString(str));
+    Handlebars.registerHelper('parameterType', utils.solTypeToPyType.bind(utils, ParamKind.Input, args.backend));
+    Handlebars.registerHelper('returnType', utils.solTypeToPyType.bind(utils, ParamKind.Output, args.backend));
+    Handlebars.registerHelper(
+        'sanitizeDevdocDetails',
+        (methodName: string, devdocDetails: string, indent: number, options) => {
+            // wrap to 80 columns, assuming given indent, so that generated
+            // docstrings can pass pycodestyle checks.
+            if (devdocDetails === undefined || devdocDetails.length === 0) {
+                return '';
+            }
+            const columnsPerRow = 80;
+            return new Handlebars.SafeString(
+                `\n${cliFormat.wrap(devdocDetails || '', {
+                    paddingLeft: ' '.repeat(indent),
+                    width: columnsPerRow - indent,
+                    ansi: false,
+                })}\n`,
+            );
+        },
+    );
+}
+if (args.language === 'TypeScript') {
+    registerTypeScriptHelpers();
+} else if (args.language === 'Python') {
+    registerPythonHelpers();
+}
+registerPartials();
+
+function makeLanguageSpecificName(methodName: string): string {
+    return args.language === 'Python' ? changeCase.snake(methodName) : methodName;
+}
 
 if (_.isEmpty(abiFileNames)) {
     logUtils.log(`${chalk.red(`No ABI files found.`)}`);
@@ -90,14 +144,18 @@ for (const abiFileName of abiFileNames) {
     logUtils.log(`Processing: ${chalk.bold(namedContent.name)}...`);
     const parsedContent = JSON.parse(namedContent.content);
     let ABI;
+    let devdoc: DevdocOutput;
     if (_.isArray(parsedContent)) {
         ABI = parsedContent; // ABI file
-    } else if (!_.isUndefined(parsedContent.abi)) {
+    } else if (parsedContent.abi !== undefined) {
         ABI = parsedContent.abi; // Truffle artifact
-    } else if (!_.isUndefined(parsedContent.compilerOutput.abi)) {
+    } else if (parsedContent.compilerOutput.abi !== undefined) {
         ABI = parsedContent.compilerOutput.abi; // 0x artifact
+        if (parsedContent.compilerOutput.devdoc !== undefined) {
+            devdoc = parsedContent.compilerOutput.devdoc;
+        }
     }
-    if (_.isUndefined(ABI)) {
+    if (ABI === undefined) {
         logUtils.log(`${chalk.red(`ABI not found in ${abiFileName}.`)}`);
         logUtils.log(
             `Please make sure your ABI file is either an array with ABI entries or a truffle artifact or 0x sol-compiler artifact`,
@@ -106,15 +164,24 @@ for (const abiFileName of abiFileNames) {
     }
 
     const outFileName = utils.makeOutputFileName(namedContent.name);
-    const outFilePath = `${args.output}/${outFileName}.ts`;
+    const outFileExtension = (() => {
+        if (args.language === 'TypeScript') {
+            return 'ts';
+        } else if (args.language === 'Python') {
+            return 'py';
+        } else {
+            throw new Error(`Unexpected language '${args.language}'`);
+        }
+    })();
+    const outFilePath = `${args.output}/${outFileName}.${outFileExtension}`;
 
-    if (utils.isOutputFileUpToDate(abiFileName, outFilePath)) {
+    if (utils.isOutputFileUpToDate(outFilePath, [abiFileName, args.template, ...partialTemplateFileNames])) {
         logUtils.log(`Already up to date: ${chalk.bold(outFilePath)}`);
         continue;
     }
 
     let ctor = ABI.find((abi: AbiDefinition) => abi.type === ABI_TYPE_CONSTRUCTOR) as ConstructorAbi;
-    if (_.isUndefined(ctor)) {
+    if (ctor === undefined) {
         ctor = utils.getEmptyConstructor(); // The constructor exists, but it's implicit in JSON's ABI definition
     }
 
@@ -127,26 +194,40 @@ for (const abiFileName of abiFileNames) {
                 input.name = `index_${inputIndex}`;
             }
         });
+        const functionSignature = new AbiEncoder.Method(methodAbi).getSignature();
+        const languageSpecificName: string = makeLanguageSpecificName(sanitizedMethodAbis[methodAbiIndex].name);
         // This will make templates simpler
         const methodData = {
             ...methodAbi,
             singleReturnValue: methodAbi.outputs.length === 1,
             hasReturnValue: methodAbi.outputs.length !== 0,
-            tsName: sanitizedMethodAbis[methodAbiIndex].name,
-            functionSignature: abiUtils.getFunctionSignature(methodAbi),
+            languageSpecificName,
+            functionSignature,
+            devdoc: devdoc ? devdoc.methods[functionSignature] : undefined,
         };
         return methodData;
     });
 
     const eventAbis = ABI.filter((abi: AbiDefinition) => abi.type === ABI_TYPE_EVENT) as EventAbi[];
+    const eventsData = _.map(eventAbis, (eventAbi, eventAbiIndex: number) => {
+        const languageSpecificName = makeLanguageSpecificName(eventAbi.name);
+
+        const eventData = {
+            ...eventAbi,
+            languageSpecificName,
+        };
+        return eventData;
+    });
 
     const contextData = {
         contractName: namedContent.name,
         ctor,
+        ABI: ABI as ContractAbi,
+        ABIString: JSON.stringify(ABI),
         methods: methodsData,
-        events: eventAbis,
+        events: eventsData,
     };
-    const renderedTsCode = template(contextData);
-    utils.writeOutputFile(outFilePath, renderedTsCode);
+    const renderedCode = template(contextData);
+    utils.writeOutputFile(outFilePath, renderedCode);
     logUtils.log(`Created: ${chalk.bold(outFilePath)}`);
 }

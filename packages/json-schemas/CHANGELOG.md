@@ -5,7 +5,129 @@ Edit the package's CHANGELOG.json file only.
 
 CHANGELOG
 
-## v1.0.1-rc.4 - _August 13, 2018_
+## v3.0.11 - _July 13, 2019_
+
+    * Dependencies updated
+
+## v3.0.10 - _May 10, 2019_
+
+    * Dependencies updated
+
+## v3.0.9 - _April 11, 2019_
+
+    * Dependencies updated
+
+## v3.0.8 - _March 21, 2019_
+
+    * Dependencies updated
+
+## v3.0.7 - _March 20, 2019_
+
+    * Dependencies updated
+
+## v3.0.6 - _March 1, 2019_
+
+    * Dependencies updated
+
+## v3.0.5 - _February 26, 2019_
+
+    * Dependencies updated
+
+## v3.0.4 - _February 25, 2019_
+
+    * Dependencies updated
+
+## v3.0.3 - _February 9, 2019_
+
+    * Dependencies updated
+
+## v3.0.2 - _February 7, 2019_
+
+    * Dependencies updated
+
+## v3.0.1 - _February 6, 2019_
+
+    * Dependencies updated
+
+## v3.0.0 - _February 5, 2019_
+
+    * Upgrade the bignumber.js to v8.0.2 (#1517)
+    * Add `verifyingContractAddress` to `zeroExTransactionSchema` (#1576)
+
+## v2.1.7 - _January 15, 2019_
+
+    * Dependencies updated
+
+## v2.1.6 - _January 11, 2019_
+
+    * Dependencies updated
+
+## v2.1.5 - _January 9, 2019_
+
+    * Dependencies updated
+
+## v2.1.4 - _December 13, 2018_
+
+    * Dependencies updated
+
+## v2.1.3 - _December 11, 2018_
+
+    * Dependencies updated
+
+## v2.1.2 - _November 21, 2018_
+
+    * Dependencies updated
+
+## v2.1.1 - _November 14, 2018_
+
+    * Dependencies updated
+
+## v2.1.0 - _November 12, 2018_
+
+    * Improve schemas by enforcing that amounts that must be whole numbers (e.g Order asset amounts) no longer allow decimal amounts (#1173)
+    * Add schemas from @0x/connect (#1250)
+
+## v2.0.0 - _October 18, 2018_
+
+    * Convert all schemas to JSON files so that they can be used with `json-schema` implemenations in other programming languages. (#1145)
+
+## v1.0.7 - _October 4, 2018_
+
+    * Dependencies updated
+
+## v1.0.6 - _October 2, 2018_
+
+    * Dependencies updated
+
+## v1.0.5 - _September 28, 2018_
+
+    * Dependencies updated
+
+## v1.0.4 - _September 25, 2018_
+
+    * Dependencies updated
+
+## v1.0.3 - _September 25, 2018_
+
+    * Dependencies updated
+
+## v1.0.2 - _September 21, 2018_
+
+    * Dependencies updated
+
+## v1.0.1 - _September 5, 2018_
+
+    * Dependencies updated
+
+## v1.0.1-rc.6 - _August 27, 2018_
+
+    * Dependencies updated
+
+## v1.0.1-rc.5 - _August 24, 2018_
+
+    * Update incorrect relayer api fee recipients response schema (#974)
+
+## v1.0.1-rc.4 - _August 14, 2018_
 
     * Allow for additional properties in txData schema (#938)
     * Change hexSchema to match `0x` (#937)

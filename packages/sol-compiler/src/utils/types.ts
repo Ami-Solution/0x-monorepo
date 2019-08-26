@@ -1,5 +1,3 @@
-import * as solc from 'solc';
-
 export enum AbiType {
     Function = 'function',
     Constructor = 'constructor',
@@ -7,56 +5,16 @@ export enum AbiType {
     Fallback = 'fallback',
 }
 
-export interface ContractArtifact extends ContractVersionData {
-    schemaVersion: string;
-    contractName: string;
-    networks: ContractNetworks;
-}
-
-export interface ContractVersionData {
-    compiler: {
-        name: 'solc';
-        version: string;
-        settings: solc.CompilerSettings;
-    };
-    sources: {
-        [sourceName: string]: {
-            id: number;
-        };
-    };
-    sourceCodes: {
-        [sourceName: string]: string;
-    };
-    sourceTreeHashHex: string;
-    compilerOutput: solc.StandardContractOutput;
-}
-
-export interface ContractNetworks {
-    [networkId: number]: ContractNetworkData;
-}
-
-export interface ContractNetworkData {
-    address: string;
-    links: {
-        [linkName: string]: string;
-    };
-    constructorArgs: string;
-}
-
 export interface SolcErrors {
     [key: string]: boolean;
 }
 
-export interface CompilerOptions {
-    contractsDir?: string;
-    artifactsDir?: string;
-    compilerSettings?: solc.CompilerSettings;
-    contracts?: string[] | '*';
-    solcVersion?: string;
-}
-
 export interface ContractSourceData {
     [contractName: string]: ContractSpecificSourceData;
+}
+
+export interface BinaryPaths {
+    [key: string]: string;
 }
 
 export interface ContractSpecificSourceData {
@@ -75,3 +33,12 @@ export interface Token {
 }
 
 export type DoneCallback = (err?: Error) => void;
+
+export class CompilationError extends Error {
+    public errorsCount: number;
+    public typeName = 'CompilationError';
+    constructor(errorsCount: number) {
+        super('Compilation errors encountered');
+        this.errorsCount = errorsCount;
+    }
+}

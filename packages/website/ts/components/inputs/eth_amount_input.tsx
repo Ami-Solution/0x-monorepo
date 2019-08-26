@@ -1,5 +1,5 @@
-import { BigNumber } from '@0xproject/utils';
-import { Web3Wrapper } from '@0xproject/web3-wrapper';
+import { BigNumber } from '@0x/utils';
+import { Web3Wrapper } from '@0x/web3-wrapper';
 import * as _ from 'lodash';
 import * as React from 'react';
 import { BalanceBoundedInput } from 'ts/components/inputs/balance_bounded_input';
@@ -54,12 +54,11 @@ export class EthAmountInput extends React.Component<EthAmountInputProps, EthAmou
         );
     }
     private _onChange(isValid: boolean, amount?: BigNumber): void {
-        const baseUnitAmountIfExists = _.isUndefined(amount)
-            ? undefined
-            : Web3Wrapper.toBaseUnitAmount(amount, constants.DECIMAL_PLACES_ETH);
+        const baseUnitAmountIfExists =
+            amount === undefined ? undefined : Web3Wrapper.toBaseUnitAmount(amount, constants.DECIMAL_PLACES_ETH);
         this.props.onChange(isValid, baseUnitAmountIfExists);
     }
     private _getLabelStyle(): React.CSSProperties {
-        return this.props.labelStyle || { paddingTop: _.isUndefined(this.props.label) ? 15 : 40 };
+        return this.props.labelStyle || { paddingTop: this.props.label === undefined ? 15 : 40 };
     }
 }

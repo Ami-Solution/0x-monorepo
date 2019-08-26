@@ -1,4 +1,4 @@
-import { fetchAsync, logUtils } from '@0xproject/utils';
+import { fetchAsync, logUtils } from '@0x/utils';
 import * as _ from 'lodash';
 import * as queryString from 'query-string';
 
@@ -39,7 +39,7 @@ export const fetchUtils = {
 
 function queryStringFromQueryParams(queryParams?: object): string {
     // if params are undefined or empty, return an empty string
-    if (_.isUndefined(queryParams) || _.isEmpty(queryParams)) {
+    if (queryParams === undefined || _.isEmpty(queryParams)) {
         return '';
     }
     // stringify the formatted object

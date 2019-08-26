@@ -1,11 +1,11 @@
-import { assert as sharedAssert } from '@0xproject/assert';
+import { assert as sharedAssert } from '@0x/assert';
 // HACK: We need those two unused imports because they're actually used by sharedAssert which gets injected here
-import { Schema } from '@0xproject/json-schemas'; // tslint:disable-line:no-unused-variable
-import { assetDataUtils, isValidSignatureAsync } from '@0xproject/order-utils';
-import { ECSignature, Order } from '@0xproject/types'; // tslint:disable-line:no-unused-variable
-import { BigNumber } from '@0xproject/utils'; // tslint:disable-line:no-unused-variable
-import { Web3Wrapper } from '@0xproject/web3-wrapper';
-import { Provider } from 'ethereum-types';
+import { Schema } from '@0x/json-schemas'; // tslint:disable-line:no-unused-variable
+import { assetDataUtils, signatureUtils } from '@0x/order-utils';
+import { Order } from '@0x/types'; // tslint:disable-line:no-unused-variable
+import { BigNumber } from '@0x/utils'; // tslint:disable-line:no-unused-variable
+import { Web3Wrapper } from '@0x/web3-wrapper';
+import { SupportedProvider } from 'ethereum-types';
 import * as _ from 'lodash';
 
 import { constants } from './constants';
@@ -13,12 +13,17 @@ import { constants } from './constants';
 export const assert = {
     ...sharedAssert,
     async isValidSignatureAsync(
-        provider: Provider,
+        supportedProvider: SupportedProvider,
         orderHash: string,
         signature: string,
         signerAddress: string,
     ): Promise<void> {
-        const isValid = await isValidSignatureAsync(provider, orderHash, signature, signerAddress);
+        const isValid = await signatureUtils.isValidSignatureAsync(
+            supportedProvider,
+            orderHash,
+            signature,
+            signerAddress,
+        );
         sharedAssert.assert(isValid, `Expected order with hash '${orderHash}' to have a valid signature`);
     },
     isValidSubscriptionToken(variableName: string, subscriptionToken: string): void {
@@ -70,7 +75,7 @@ export const assert = {
     /*
      * Asserts that all the orders have the same value for the provided propertyName
      * If the value parameter is provided, this asserts that all orders have the prope
-    */
+     */
     ordersHaveAtMostOneUniqueValueForProperty(orders: Order[], propertyName: string, value?: any): void {
         const allValues = _.map(orders, order => _.get(order, propertyName));
         sharedAssert.hasAtMostOneUniqueValue(
@@ -79,7 +84,7 @@ export const assert = {
                 allValues,
             )}`,
         );
-        if (!_.isUndefined(value)) {
+        if (value !== undefined) {
             const firstValue = _.head(allValues);
             sharedAssert.assert(
                 firstValue === value,

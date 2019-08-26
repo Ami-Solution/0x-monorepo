@@ -1,14 +1,15 @@
-import { Order, SignedOrder } from '@0xproject/types';
+import { Order, SignedOrder } from '@0x/types';
 import * as _ from 'lodash';
 
-import { constants, orderFactory } from '../../src';
+import { constants } from '../../src/constants';
+import { orderFactory } from '../../src/order_factory';
 
 const BASE_TEST_ORDER: Order = orderFactory.createOrder(
     constants.NULL_ADDRESS,
     constants.ZERO_AMOUNT,
-    constants.NULL_ADDRESS,
+    constants.NULL_ERC20_ASSET_DATA,
     constants.ZERO_AMOUNT,
-    constants.NULL_ADDRESS,
+    constants.NULL_ERC20_ASSET_DATA,
     constants.NULL_ADDRESS,
 );
 const BASE_TEST_SIGNED_ORDER: SignedOrder = {

@@ -1,6 +1,6 @@
-import { colors, EtherscanLinkSuffixes } from '@0xproject/react-shared';
-import { BigNumber } from '@0xproject/utils';
-import { Web3Wrapper } from '@0xproject/web3-wrapper';
+import { colors, EtherscanLinkSuffixes } from '@0x/react-shared';
+import { BigNumber } from '@0x/utils';
+import { Web3Wrapper } from '@0x/web3-wrapper';
 import * as _ from 'lodash';
 import Paper from 'material-ui/Paper';
 import * as moment from 'moment';
@@ -36,7 +36,7 @@ export class TradeHistoryItem extends React.Component<TradeHistoryItemProps, Tra
         // tokens the client does not know how to display.
         // TODO: Try to retrieve the name/symbol of an unknown token in order to display it
         // Be sure to remove similar logic in trade_history.tsx
-        if (_.isUndefined(takerToken) || _.isUndefined(makerToken)) {
+        if (takerToken === undefined || makerToken === undefined) {
             return null;
         }
 

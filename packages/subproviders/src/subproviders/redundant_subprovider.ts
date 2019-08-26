@@ -1,6 +1,5 @@
-import { promisify } from '@0xproject/utils';
+import { promisify } from '@0x/utils';
 import { JSONRPCRequestPayload } from 'ethereum-types';
-import * as _ from 'lodash';
 
 import { Callback } from '../types';
 
@@ -28,13 +27,13 @@ export class RedundantSubprovider extends Subprovider {
                 continue;
             }
         }
-        if (!_.isUndefined(lastErr)) {
+        if (lastErr !== undefined) {
             throw lastErr;
         }
     }
     /**
      * Instantiates a new RedundantSubprovider
-     * @param endpoints JSON RPC endpoints to attempt. Attempts are made in the order of the endpoints.
+     * @param subproviders Subproviders to attempt the request with
      */
     constructor(subproviders: Subprovider[]) {
         super();

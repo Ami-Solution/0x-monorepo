@@ -1,4 +1,6 @@
 declare module 'solc' {
+    export { ErrorType, ErrorSeverity, SolcError, StandardContractOutput, StandardOutput } from 'ethereum-types';
+    import { SolcError } from 'ethereum-types';
     export interface ContractCompilationResult {
         srcmap: string;
         srcmapRuntime: string;
@@ -64,6 +66,15 @@ declare module 'solc' {
         optimizer?: {
             enabled: boolean;
             runs?: number;
+            details?: {
+                peephole?: boolean;
+                jumpdestRemover?: boolean;
+                orderLiterals?: boolean;
+                deduplicate?: boolean;
+                cse?: boolean;
+                constantOptimizer?: boolean;
+                yul?: boolean;
+            };
         };
         evmVersion?: 'homestead' | 'tangerineWhistle' | 'spuriousDragon' | 'byzantium' | 'constantinople';
         metadata?: {
@@ -87,70 +98,17 @@ declare module 'solc' {
         };
         settings: CompilerSettings;
     }
-    export type ErrorType =
-        | 'JSONError'
-        | 'IOError'
-        | 'ParserError'
-        | 'DocstringParsingError'
-        | 'SyntaxError'
-        | 'DeclarationError'
-        | 'TypeError'
-        | 'UnimplementedFeatureError'
-        | 'InternalCompilerError'
-        | 'Exception'
-        | 'CompilerError'
-        | 'FatalError'
-        | 'Warning';
-    export type ErrorSeverity = 'error' | 'warning';
-    export interface Error {
-        sourceLocation?: {
-            file: string;
-            start: number;
-            end: number;
-        };
-        type: ErrorType;
-        component: 'general' | 'ewasm';
-        severity: ErrorSeverity;
-        message: string;
-        formattedMessage?: string;
-    }
-    import { ContractAbi } from 'ethereum-types';
-    export interface StandardContractOutput {
-        abi: ContractAbi;
-        evm: {
-            bytecode: {
-                object: string;
-                sourceMap: string;
-            };
-            deployedBytecode: {
-                object: string;
-                sourceMap: string;
-            };
-        };
-    }
-    export interface StandardOutput {
-        errors: Error[];
-        sources: {
-            [fileName: string]: {
-                id: number;
-                ast?: object;
-                legacyAST?: object;
-            };
-        };
-        contracts: {
-            [fileName: string]: {
-                [contractName: string]: StandardContractOutput;
-            };
-        };
-    }
     export interface SolcInstance {
         compile(
             sources: InputSources,
             optimizerEnabled: number,
             findImports: (importPath: string) => ImportContents,
         ): CompilationResult;
-        compileStandardWrapper(input: string, findImports: (importPath: string) => ImportContents): string;
+        compileStandardWrapper(input: string, findImports?: (importPath: string) => ImportContents): string;
     }
-    export function loadRemoteVersion(versionName: string, cb: (err: Error | null, res?: SolcInstance) => void): void;
+    export function loadRemoteVersion(
+        versionName: string,
+        cb: (err: SolcError | null, res?: SolcInstance) => void,
+    ): void;
     export function setupMethods(solcBin: any): SolcInstance;
 }

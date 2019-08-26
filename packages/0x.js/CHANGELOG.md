@@ -5,7 +5,173 @@ Edit the package's CHANGELOG.json file only.
 
 CHANGELOG
 
-## v1.0.1-rc.3 - _August 13, 2018_
+## v6.0.10 - _July 13, 2019_
+
+    * Dependencies updated
+
+## v6.0.9 - _May 15, 2019_
+
+    * Dependencies updated
+
+## v6.0.8 - _May 14, 2019_
+
+    * Dependencies updated
+
+## v6.0.7 - _May 10, 2019_
+
+    * Dependencies updated
+
+## v6.0.6 - _April 11, 2019_
+
+    * Dependencies updated
+
+## v6.0.5 - _March 21, 2019_
+
+    * Dependencies updated
+
+## v6.0.4 - _March 20, 2019_
+
+    * Dependencies updated
+
+## v6.0.3 - _March 1, 2019_
+
+    * Dependencies updated
+
+## v6.0.2 - _February 27, 2019_
+
+    * Dependencies updated
+
+## v6.0.1 - _February 26, 2019_
+
+    * Dependencies updated
+
+## v6.0.0 - _February 25, 2019_
+
+    * Add support for EIP1193 providers & Web3.js providers >= 1.0-beta.38 (#1627)
+    * Update provider params to type SupportedProvider which outlines all supported providers (#1627)
+
+## v5.0.0 - _February 9, 2019_
+
+    * Export `transactionHashUtils`, `DecodedCalldata`, `ZeroExTransaction`, and `SignedZeroExTransaction` (#1569)
+
+## v4.0.3 - _February 7, 2019_
+
+    * Dependencies updated
+
+## v4.0.2 - _February 7, 2019_
+
+    * Dependencies updated
+
+## v4.0.1 - _February 6, 2019_
+
+    * Dependencies updated
+
+## v4.0.0 - _February 5, 2019_
+
+    * Upgrade the bignumber.js to v8.0.2 (#1517)
+
+## v3.0.3 - _January 17, 2019_
+
+    * Dependencies updated
+
+## v3.0.2 - _January 15, 2019_
+
+    * Dependencies updated
+
+## v3.0.1 - _January 11, 2019_
+
+    * Dependencies updated
+
+## v3.0.0 - _January 9, 2019_
+
+    * Export `MultiAssetData`, `MultiAssetDataWithRecursiveDecoding`, `ObjectMap`, and `SingleAssetData` from types. No longer export `AssetData`. (#1363)
+
+## v2.0.8 - _December 13, 2018_
+
+    * Dependencies updated
+
+## v2.0.7 - _December 11, 2018_
+
+    * Dependencies updated
+
+## v2.0.6 - _November 28, 2018_
+
+    * Dependencies updated
+
+## v2.0.5 - _November 21, 2018_
+
+    * Dependencies updated
+
+## v2.0.4 - _November 14, 2018_
+
+    * Dependencies updated
+
+## v2.0.3 - _November 13, 2018_
+
+    * Dependencies updated
+
+## v2.0.2 - _November 12, 2018_
+
+    * Dependencies updated
+
+## v2.0.1 - _November 9, 2018_
+
+    * Dependencies updated
+
+## v2.0.0 - _October 18, 2018_
+
+    * Add support for `eth_signTypedData`. (#1102)
+    * Added `MetamaskSubprovider` to handle inconsistencies in Metamask's signing JSON RPC endpoints. (#1102)
+    * Removed `SignerType` (including `SignerType.Metamask`). Please use the `MetamaskSubprovider` to wrap `web3.currentProvider`. (#1102)
+    * Updated to use new modularized artifacts and the latest version of @0xproject/contract-wrappers (#1105)
+    * Make web3-provider-engine types a 'dependency' so it's available to users of the library (#1105)
+    * Export new `AssetData` type from types (#1131)
+
+## v1.0.8 - _October 4, 2018_
+
+    * Dependencies updated
+
+## v1.0.7 - _September 28, 2018_
+
+    * Dependencies updated
+
+## v1.0.6 - _September 25, 2018_
+
+    * Dependencies updated
+
+## v1.0.5 - _September 25, 2018_
+
+    * Dependencies updated
+
+## v1.0.4 - _September 21, 2018_
+
+    * Dependencies updated
+
+## v1.0.3 - _September 19, 2018_
+
+    * Drastically reduce the bundle size by removing unused parts of included contract artifacts.
+
+## v1.0.2 - _September 18, 2018_
+
+    * Add ZRX & WETH mainnet contract addresses into the included artifacts
+
+## v1.0.1 - _September 5, 2018_
+
+    * Dependencies updated
+
+## v1.0.1-rc.6 - _August 27, 2018_
+
+    * Fix missing `BlockParamLiteral` type import issue
+
+## v1.0.1-rc.5 - _Invalid date_
+
+    * Fix `main` and `types` package.json entries so that they point to the new location of index.d.ts and index.js
+
+## v1.0.1-rc.4 - _August 24, 2018_
+
+    * Re-organize the exported interface of 0x.js. Remove the `ZeroEx` class, and instead export the same exports as `0x.js`'s sub-packages: `@0xproject/contract-wrappers`, `@0xproject/order-utils` and `@0xproject/order-watcher` (#963)
+
+## v1.0.1-rc.3 - _August 14, 2018_
 
     * Dependencies updated
     * Update ecSignOrderHashAsync to return the signature as a string for immediate use in contracts (#914)

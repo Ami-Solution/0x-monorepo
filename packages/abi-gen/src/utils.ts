@@ -7,6 +7,41 @@ import toSnakeCase = require('to-snake-case');
 import { ContractsBackend, ParamKind } from './types';
 
 export const utils = {
+    solTypeToAssertion(solName: string, solType: string): string {
+        const trailingArrayRegex = /\[\d*\]$/;
+        if (solType.match(trailingArrayRegex)) {
+            const assertion = `assert.isArray('${solName}', ${solName});`;
+            return assertion;
+        } else {
+            const solTypeRegexToTsType = [
+                {
+                    regex: '^u?int(8|16|32)?$',
+                    assertion: `assert.isNumberOrBigNumber('${solName}', ${solName});`,
+                },
+                { regex: '^string$', assertion: `assert.isString('${solName}', ${solName});` },
+                { regex: '^address$', assertion: `assert.isString('${solName}', ${solName});` },
+                { regex: '^bool$', assertion: `assert.isBoolean('${solName}', ${solName});` },
+                { regex: '^u?int\\d*$', assertion: `assert.isBigNumber('${solName}', ${solName});` },
+                { regex: '^bytes\\d*$', assertion: `assert.isString('${solName}', ${solName});` },
+            ];
+            for (const regexAndTxType of solTypeRegexToTsType) {
+                const { regex, assertion } = regexAndTxType;
+                if (solType.match(regex)) {
+                    return assertion;
+                }
+            }
+            const TUPLE_TYPE_REGEX = '^tuple$';
+            if (solType.match(TUPLE_TYPE_REGEX)) {
+                // NOTE(fabio): Omit assertions for complex types since this would require taking a type
+                // definition and generating an instance of that type programmatically and checking it
+                // against a list of know json-schemas in order to discover the correct schema assertion
+                // to use. This approach is brittle and error-prone.
+                const assertion = '';
+                return assertion;
+            }
+            throw new Error(`Unknown Solidity type found: ${solType}`);
+        }
+    },
     solTypeToTsType(paramKind: ParamKind, backend: ContractsBackend, solType: string, components?: DataItem[]): string {
         const trailingArrayRegex = /\[\d*\]$/;
         if (solType.match(trailingArrayRegex)) {
@@ -63,6 +98,45 @@ export const utils = {
             throw new Error(`Unknown Solidity type found: ${solType}`);
         }
     },
+    solTypeToPyType(paramKind: ParamKind, backend: ContractsBackend, solType: string, components?: DataItem[]): string {
+        const trailingArrayRegex = /\[\d*\]$/;
+        if (solType.match(trailingArrayRegex)) {
+            const arrayItemSolType = solType.replace(trailingArrayRegex, '');
+            const arrayItemPyType = utils.solTypeToPyType(paramKind, backend, arrayItemSolType, components);
+            const arrayPyType = `Array[${arrayItemPyType}]`;
+            return arrayPyType;
+        } else {
+            const solTypeRegexToPyType = [
+                { regex: '^string$', pyType: 'str' },
+                { regex: '^address$', pyType: 'str' },
+                { regex: '^bool$', pyType: 'bool' },
+                { regex: '^u?int\\d*$', pyType: 'int' },
+                { regex: '^bytes\\d*$', pyType: 'bytes' },
+            ];
+            for (const regexAndTxType of solTypeRegexToPyType) {
+                const { regex, pyType } = regexAndTxType;
+                if (solType.match(regex)) {
+                    return pyType;
+                }
+            }
+            const TUPLE_TYPE_REGEX = '^tuple$';
+            if (solType.match(TUPLE_TYPE_REGEX)) {
+                const componentsType = _.map(components, component => {
+                    const componentValueType = utils.solTypeToPyType(
+                        paramKind,
+                        backend,
+                        component.type,
+                        component.components,
+                    );
+                    const componentType = `'${component.name}': ${componentValueType}`;
+                    return componentType;
+                });
+                const pyType = `TypedDict('${solType}(${components})', {${componentsType.join(',')}}`;
+                return pyType;
+            }
+            throw new Error(`Unknown Solidity type found: ${solType}`);
+        }
+    },
     isUnionType(tsType: string): boolean {
         return tsType === 'number|BigNumber';
     },
@@ -103,11 +177,11 @@ export const utils = {
     writeOutputFile(filePath: string, renderedTsCode: string): void {
         fs.writeFileSync(filePath, renderedTsCode);
     },
-    isOutputFileUpToDate(abiFile: string, outputFile: string): boolean {
-        const abiFileModTimeMs = fs.statSync(abiFile).mtimeMs;
+    isOutputFileUpToDate(outputFile: string, sourceFiles: string[]): boolean {
+        const sourceFileModTimeMs = sourceFiles.map(file => fs.statSync(file).mtimeMs);
         try {
             const outFileModTimeMs = fs.statSync(outputFile).mtimeMs;
-            return outFileModTimeMs > abiFileModTimeMs;
+            return sourceFileModTimeMs.find(sourceMs => sourceMs > outFileModTimeMs) === undefined;
         } catch (err) {
             if (err.code === 'ENOENT') {
                 return false;

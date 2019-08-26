@@ -2,7 +2,7 @@ import * as _ from 'lodash';
 import * as React from 'react';
 import { RouteComponentProps, withRouter } from 'react-router';
 
-import { BigNumber } from '@0xproject/utils';
+import { BigNumber } from '@0x/utils';
 import { Blockchain } from 'ts/blockchain';
 import { AddEthOnboardingStep } from 'ts/components/onboarding/add_eth_onboarding_step';
 import { CongratsOnboardingStep } from 'ts/components/onboarding/congrats_onboarding_step';
@@ -256,7 +256,7 @@ class PlainPortalOnboardingFlow extends React.Component<PortalOnboardingFlowProp
             return null;
         }
         const tokenStateIfExists = this.props.trackedTokenStateByAddress[token.address];
-        if (_.isUndefined(tokenStateIfExists)) {
+        if (tokenStateIfExists === undefined) {
             return null;
         }
         return (

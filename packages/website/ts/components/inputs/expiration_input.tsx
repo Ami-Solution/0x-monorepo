@@ -1,4 +1,4 @@
-import { BigNumber } from '@0xproject/utils';
+import { BigNumber } from '@0x/utils';
 import * as _ from 'lodash';
 import DatePicker from 'material-ui/DatePicker';
 import TimePicker from 'material-ui/TimePicker';
@@ -93,7 +93,7 @@ export class ExpirationInput extends React.Component<ExpirationInputProps, Expir
         this.setState({
             timeMoment,
         });
-        const dateMoment = _.isUndefined(this.state.dateMoment) ? moment() : this.state.dateMoment;
+        const dateMoment = this.state.dateMoment === undefined ? moment() : this.state.dateMoment;
         const timestamp = utils.convertToUnixTimestampSeconds(dateMoment, timeMoment);
         this.props.updateOrderExpiry(timestamp);
     }

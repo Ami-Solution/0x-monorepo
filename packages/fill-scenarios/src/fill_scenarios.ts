@@ -1,15 +1,13 @@
-import { assetDataUtils, orderFactory } from '@0xproject/order-utils';
-import { AssetProxyId, ERC721AssetData, OrderWithoutExchangeAddress, SignedOrder } from '@0xproject/types';
-import { BigNumber } from '@0xproject/utils';
-import { Web3Wrapper } from '@0xproject/web3-wrapper';
-import { Provider } from 'ethereum-types';
+import { DummyERC20TokenContract, DummyERC721TokenContract, ExchangeContract } from '@0x/abi-gen-wrappers';
+import { assetDataUtils } from '@0x/order-utils';
+import { orderFactory } from '@0x/order-utils/lib/src/order_factory';
+import { OrderWithoutExchangeAddress, SignedOrder } from '@0x/types';
+import { BigNumber } from '@0x/utils';
+import { Web3Wrapper } from '@0x/web3-wrapper';
+import { SupportedProvider } from 'ethereum-types';
 import * as _ from 'lodash';
 
-import { artifacts } from './artifacts';
 import { constants } from './constants';
-import { DummyERC20TokenContract } from './generated_contract_wrappers/dummy_erc20_token';
-import { DummyERC721TokenContract } from './generated_contract_wrappers/dummy_erc721_token';
-import { ExchangeContract } from './generated_contract_wrappers/exchange';
 
 export class FillScenarios {
     private readonly _web3Wrapper: Web3Wrapper;
@@ -20,14 +18,14 @@ export class FillScenarios {
     private readonly _erc20ProxyAddress: string;
     private readonly _erc721ProxyAddress: string;
     constructor(
-        provider: Provider,
+        supportedProvider: SupportedProvider,
         userAddresses: string[],
         zrxTokenAddress: string,
         exchangeAddress: string,
         erc20ProxyAddress: string,
         erc721ProxyAddress: string,
     ) {
-        this._web3Wrapper = new Web3Wrapper(provider);
+        this._web3Wrapper = new Web3Wrapper(supportedProvider);
         this._userAddresses = userAddresses;
         this._coinbase = userAddresses[0];
         this._zrxTokenAddress = zrxTokenAddress;
@@ -63,6 +61,7 @@ export class FillScenarios {
         fillableAmount: BigNumber,
         feeRecipientAddress: string,
         expirationTimeSeconds?: BigNumber,
+        senderAddress?: string,
     ): Promise<SignedOrder> {
         return this._createAsymmetricFillableSignedOrderWithFeesAsync(
             makerAssetData,
@@ -75,6 +74,7 @@ export class FillScenarios {
             fillableAmount,
             feeRecipientAddress,
             expirationTimeSeconds,
+            senderAddress,
         );
     }
     public async createAsymmetricFillableSignedOrderAsync(
@@ -119,7 +119,6 @@ export class FillScenarios {
             fillableAmount,
         );
         const exchangeInstance = new ExchangeContract(
-            artifacts.Exchange.compilerOutput.abi,
             signedOrder.exchangeAddress,
             this._web3Wrapper.getProvider(),
             this._web3Wrapper.getContractDefaults(),
@@ -150,46 +149,16 @@ export class FillScenarios {
         takerFillableAmount: BigNumber,
         feeRecipientAddress: string,
         expirationTimeSeconds?: BigNumber,
+        senderAddress?: string,
     ): Promise<SignedOrder> {
-        const decodedMakerAssetData = assetDataUtils.decodeAssetDataOrThrow(makerAssetData);
-        if (decodedMakerAssetData.assetProxyId === AssetProxyId.ERC20) {
-            await this._increaseERC20BalanceAndAllowanceAsync(
-                decodedMakerAssetData.tokenAddress,
-                makerAddress,
-                makerFillableAmount,
-            );
-        } else {
-            if (!makerFillableAmount.equals(1)) {
-                throw new Error(`ERC721 makerFillableAmount should be equal 1. Found: ${makerFillableAmount}`);
-            }
-            await this._increaseERC721BalanceAndAllowanceAsync(
-                decodedMakerAssetData.tokenAddress,
-                makerAddress,
-                // tslint:disable-next-line:no-unnecessary-type-assertion
-                (decodedMakerAssetData as ERC721AssetData).tokenId,
-            );
-        }
-        const decodedTakerAssetData = assetDataUtils.decodeAssetDataOrThrow(takerAssetData);
-        if (decodedTakerAssetData.assetProxyId === AssetProxyId.ERC20) {
-            const takerTokenAddress = decodedTakerAssetData.tokenAddress;
-            await this._increaseERC20BalanceAndAllowanceAsync(takerTokenAddress, takerAddress, takerFillableAmount);
-        } else {
-            if (!takerFillableAmount.equals(1)) {
-                throw new Error(`ERC721 takerFillableAmount should be equal 1. Found: ${takerFillableAmount}`);
-            }
-            await this._increaseERC721BalanceAndAllowanceAsync(
-                decodedTakerAssetData.tokenAddress,
-                takerAddress,
-                // tslint:disable-next-line:no-unnecessary-type-assertion
-                (decodedMakerAssetData as ERC721AssetData).tokenId,
-            );
-        }
+        await this._increaseBalanceAndAllowanceWithAssetDataAsync(makerAssetData, makerAddress, makerFillableAmount);
+        await this._increaseBalanceAndAllowanceWithAssetDataAsync(takerAssetData, takerAddress, takerFillableAmount);
         // Fees
         await Promise.all([
             this._increaseERC20BalanceAndAllowanceAsync(this._zrxTokenAddress, makerAddress, makerFee),
             this._increaseERC20BalanceAndAllowanceAsync(this._zrxTokenAddress, takerAddress, takerFee),
         ]);
-        const senderAddress = constants.NULL_ADDRESS;
+        const _senderAddress = senderAddress ? senderAddress : constants.NULL_ADDRESS;
 
         const signedOrder = await orderFactory.createSignedOrderAsync(
             this._web3Wrapper.getProvider(),
@@ -201,7 +170,7 @@ export class FillScenarios {
             this._exchangeAddress,
             {
                 takerAddress,
-                senderAddress,
+                senderAddress: _senderAddress,
                 makerFee,
                 takerFee,
                 feeRecipientAddress,
@@ -224,7 +193,6 @@ export class FillScenarios {
         tokenId: BigNumber,
     ): Promise<void> {
         const erc721Token = new DummyERC721TokenContract(
-            artifacts.DummyERC721Token.compilerOutput.abi,
             tokenAddress,
             this._web3Wrapper.getProvider(),
             this._web3Wrapper.getContractDefaults(),
@@ -240,7 +208,6 @@ export class FillScenarios {
         tokenId: BigNumber,
     ): Promise<void> {
         const erc721Token = new DummyERC721TokenContract(
-            artifacts.DummyERC721Token.compilerOutput.abi,
             tokenAddress,
             this._web3Wrapper.getProvider(),
             this._web3Wrapper.getContractDefaults(),
@@ -270,7 +237,6 @@ export class FillScenarios {
     }
     private async _increaseERC20BalanceAsync(tokenAddress: string, address: string, amount: BigNumber): Promise<void> {
         const erc20Token = new DummyERC20TokenContract(
-            artifacts.DummyERC20Token.compilerOutput.abi,
             tokenAddress,
             this._web3Wrapper.getProvider(),
             this._web3Wrapper.getContractDefaults(),
@@ -286,7 +252,6 @@ export class FillScenarios {
         amount: BigNumber,
     ): Promise<void> {
         const erc20Token = new DummyERC20TokenContract(
-            artifacts.DummyERC20Token.compilerOutput.abi,
             tokenAddress,
             this._web3Wrapper.getProvider(),
             this._web3Wrapper.getContractDefaults(),
@@ -298,5 +263,31 @@ export class FillScenarios {
             from: address,
         });
         await this._web3Wrapper.awaitTransactionSuccessAsync(txHash, constants.AWAIT_TRANSACTION_MINED_MS);
+    }
+    private async _increaseBalanceAndAllowanceWithAssetDataAsync(
+        assetData: string,
+        userAddress: string,
+        amount: BigNumber,
+    ): Promise<void> {
+        const decodedAssetData = assetDataUtils.decodeAssetDataOrThrow(assetData);
+        if (assetDataUtils.isERC20AssetData(decodedAssetData)) {
+            await this._increaseERC20BalanceAndAllowanceAsync(decodedAssetData.tokenAddress, userAddress, amount);
+        } else if (assetDataUtils.isERC721AssetData(decodedAssetData)) {
+            await this._increaseERC721BalanceAndAllowanceAsync(
+                decodedAssetData.tokenAddress,
+                userAddress,
+                decodedAssetData.tokenId,
+            );
+        } else if (assetDataUtils.isMultiAssetData(decodedAssetData)) {
+            for (const [index, nestedAssetDataElement] of decodedAssetData.nestedAssetData.entries()) {
+                const amountsElement = decodedAssetData.amounts[index];
+                const totalAmount = amount.times(amountsElement);
+                await this._increaseBalanceAndAllowanceWithAssetDataAsync(
+                    nestedAssetDataElement,
+                    userAddress,
+                    totalAmount,
+                );
+            }
+        }
     }
 }

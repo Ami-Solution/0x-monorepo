@@ -1,22 +1,23 @@
-import { ContractWrappersError, ExchangeContractErrs } from '@0xproject/contract-wrappers';
-import { OrderError } from '@0xproject/order-utils';
-import { constants as sharedConstants, Networks } from '@0xproject/react-shared';
-import { ECSignature, Provider } from '@0xproject/types';
-import { BigNumber } from '@0xproject/utils';
-import { Web3Wrapper } from '@0xproject/web3-wrapper';
+import { ContractWrappersError } from '@0x/contract-wrappers';
+import { assetDataUtils, TypedDataError } from '@0x/order-utils';
+import { constants as sharedConstants, Networks } from '@0x/react-shared';
+import { ExchangeContractErrs } from '@0x/types';
+import { BigNumber } from '@0x/utils';
+import { Web3Wrapper } from '@0x/web3-wrapper';
 import * as bowser from 'bowser';
-import deepEqual = require('deep-equal');
+import deepEqual from 'deep-equal';
 import * as _ from 'lodash';
 import * as moment from 'moment';
 import * as numeral from 'numeral';
 
+import { ZeroExProvider } from 'ethereum-types';
 import {
     AccountState,
     BlockchainCallErrs,
     BrowserType,
     Environments,
     OperatingSystemType,
-    Order,
+    PortalOrder,
     Providers,
     ProviderType,
     ScreenWidths,
@@ -49,7 +50,7 @@ export const utils = {
     },
     convertToUnixTimestampSeconds(date: moment.Moment, time?: moment.Moment): BigNumber {
         const finalMoment = date;
-        if (!_.isUndefined(time)) {
+        if (time !== undefined) {
             finalMoment.hours(time.hours());
             finalMoment.minutes(time.minutes());
         }
@@ -64,35 +65,36 @@ export const utils = {
         return formattedDate;
     },
     generateOrder(
-        exchangeContractAddress: string,
+        exchangeAddress: string,
         sideToAssetToken: SideToAssetToken,
-        expirationUnixTimestampSec: BigNumber,
+        expirationTimeSeconds: BigNumber,
         orderTakerAddress: string,
         orderMakerAddress: string,
         makerFee: BigNumber,
         takerFee: BigNumber,
-        feeRecipient: string,
-        ecSignature: ECSignature,
+        feeRecipientAddress: string,
+        signature: string,
         tokenByAddress: TokenByAddress,
         orderSalt: BigNumber,
-    ): Order {
+    ): PortalOrder {
         const makerToken = tokenByAddress[sideToAssetToken[Side.Deposit].address];
         const takerToken = tokenByAddress[sideToAssetToken[Side.Receive].address];
         const order = {
             signedOrder: {
-                maker: orderMakerAddress,
-                taker: orderTakerAddress,
-                makerFee: makerFee.toString(),
-                takerFee: takerFee.toString(),
-                makerTokenAmount: sideToAssetToken[Side.Deposit].amount.toString(),
-                takerTokenAmount: sideToAssetToken[Side.Receive].amount.toString(),
-                makerTokenAddress: makerToken.address,
-                takerTokenAddress: takerToken.address,
-                expirationUnixTimestampSec: expirationUnixTimestampSec.toString(),
-                feeRecipient,
-                salt: orderSalt.toString(),
-                ecSignature,
-                exchangeContractAddress,
+                senderAddress: constants.NULL_ADDRESS,
+                makerAddress: orderMakerAddress,
+                takerAddress: orderTakerAddress,
+                makerFee,
+                takerFee,
+                makerAssetAmount: sideToAssetToken[Side.Deposit].amount,
+                takerAssetAmount: sideToAssetToken[Side.Receive].amount,
+                makerAssetData: assetDataUtils.encodeERC20AssetData(makerToken.address),
+                takerAssetData: assetDataUtils.encodeERC20AssetData(takerToken.address),
+                expirationTimeSeconds,
+                feeRecipientAddress,
+                salt: orderSalt,
+                signature,
+                exchangeAddress,
             },
             metadata: {
                 makerToken: {
@@ -199,7 +201,7 @@ export const utils = {
         injectedProviderName: string,
         userAddress?: string,
     ): AccountState {
-        const isAddressAvailable = !_.isUndefined(userAddress) && !_.isEmpty(userAddress);
+        const isAddressAvailable = userAddress !== undefined && !_.isEmpty(userAddress);
         const isExternallyInjectedProvider = utils.isExternallyInjected(providerType, injectedProviderName);
         if (!isBlockchainReady) {
             return AccountState.Loading;
@@ -220,24 +222,17 @@ export const utils = {
         const tokenWithSameNameIfExists = _.find(registeredTokens, {
             name: token.name,
         });
-        const isUniqueName = _.isUndefined(tokenWithSameNameIfExists);
+        const isUniqueName = tokenWithSameNameIfExists === undefined;
         const tokenWithSameSymbolIfExists = _.find(registeredTokens, {
             name: token.symbol,
         });
-        const isUniqueSymbol = _.isUndefined(tokenWithSameSymbolIfExists);
+        const isUniqueSymbol = tokenWithSameSymbolIfExists === undefined;
         return isUniqueName && isUniqueSymbol;
     },
     zeroExErrToHumanReadableErrMsg(error: ContractWrappersError | ExchangeContractErrs, takerAddress: string): string {
         const ContractWrappersErrorToHumanReadableError: { [error: string]: string } = {
-            [ContractWrappersError.ExchangeContractDoesNotExist]: 'Exchange contract does not exist',
-            [ContractWrappersError.EtherTokenContractDoesNotExist]: 'EtherToken contract does not exist',
-            [ContractWrappersError.TokenTransferProxyContractDoesNotExist]:
-                'TokenTransferProxy contract does not exist',
-            [ContractWrappersError.TokenRegistryContractDoesNotExist]: 'TokenRegistry contract does not exist',
-            [ContractWrappersError.TokenContractDoesNotExist]: 'Token contract does not exist',
-            [ContractWrappersError.ZRXContractDoesNotExist]: 'ZRX contract does not exist',
             [BlockchainCallErrs.UserHasNoAssociatedAddresses]: 'User has no addresses available',
-            [OrderError.InvalidSignature]: 'Order signature is not valid',
+            [TypedDataError.InvalidSignature]: 'Order signature is not valid',
             [ContractWrappersError.ContractNotDeployedOnNetwork]: 'Contract is not deployed on the detected network',
             [ContractWrappersError.InvalidJump]: 'Invalid jump occured while executing the transaction',
             [ContractWrappersError.OutOfGas]: 'Transaction ran out of gas',
@@ -247,12 +242,9 @@ export const utils = {
         } = {
             [ExchangeContractErrs.OrderFillExpired]: 'This order has expired',
             [ExchangeContractErrs.OrderCancelExpired]: 'This order has expired',
-            [ExchangeContractErrs.OrderCancelAmountZero]: "Order cancel amount can't be 0",
-            [ExchangeContractErrs.OrderAlreadyCancelledOrFilled]:
-                'This order has already been completely filled or cancelled',
+            [ExchangeContractErrs.OrderCancelled]: 'This order has been cancelled',
             [ExchangeContractErrs.OrderFillAmountZero]: "Order fill amount can't be 0",
-            [ExchangeContractErrs.OrderRemainingFillAmountZero]:
-                'This order has already been completely filled or cancelled',
+            [ExchangeContractErrs.OrderRemainingFillAmountZero]: 'This order has already been completely filled',
             [ExchangeContractErrs.OrderFillRoundingError]:
                 'Rounding error will occur when filling this order. Please try filling a different amount.',
             [ExchangeContractErrs.InsufficientTakerBalance]:
@@ -293,9 +285,12 @@ export const utils = {
         );
         return isTestNetwork;
     },
+    getGoogleSheetLeadUrl(form: string): string {
+        return configs.GOOGLE_SHEETS_LEAD_FORMS[form];
+    },
     getCurrentBaseUrl(): string {
         const port = window.location.port;
-        const hasPort = !_.isUndefined(port);
+        const hasPort = port !== undefined;
         const baseUrl = `https://${window.location.hostname}${hasPort ? `:${port}` : ''}`;
         return baseUrl;
     },
@@ -306,7 +301,7 @@ export const utils = {
         }
         window.onload = () => resolve();
     }),
-    getProviderType(provider: Provider): Providers | string {
+    getProviderType(provider: ZeroExProvider): Providers | string {
         const constructorName = provider.constructor.name;
         let parsedProviderName = constructorName;
         // https://ethereum.stackexchange.com/questions/24266/elegant-way-to-detect-current-provider-int-web3-js
@@ -323,9 +318,9 @@ export const utils = {
             parsedProviderName = Providers.Parity;
         } else if ((provider as any).isMetaMask) {
             parsedProviderName = Providers.Metamask;
-        } else if (!_.isUndefined(_.get(window, 'SOFA'))) {
-            parsedProviderName = Providers.Toshi;
-        } else if (!_.isUndefined(_.get(window, '__CIPHER__'))) {
+        } else if (_.get(window, 'SOFA') !== undefined) {
+            parsedProviderName = Providers.CoinbaseWallet;
+        } else if (_.get(window, '__CIPHER__') !== undefined) {
             parsedProviderName = Providers.Cipher;
         }
         return parsedProviderName;
@@ -350,18 +345,18 @@ export const utils = {
     },
     getEnvironment(): Environments {
         if (utils.isDogfood()) {
-            return Environments.DOGFOOD;
+            return Environments.Dogfood;
         }
         if (utils.isDevelopment()) {
-            return Environments.DEVELOPMENT;
+            return Environments.Development;
         }
         if (utils.isStaging()) {
-            return Environments.STAGING;
+            return Environments.Staging;
         }
         if (utils.isProduction()) {
-            return Environments.PRODUCTION;
+            return Environments.Production;
         }
-        return Environments.UNKNOWN;
+        return Environments.Unknown;
     },
     getEthToken(tokenByAddress: TokenByAddress): Token {
         return utils.getTokenBySymbol(constants.ETHER_TOKEN_SYMBOL, tokenByAddress);
@@ -402,7 +397,7 @@ export const utils = {
     },
     getUsdValueFormattedAmount(amount: BigNumber, decimals: number, price: BigNumber): string {
         const unitAmount = Web3Wrapper.toUnitAmount(amount, decimals);
-        const value = unitAmount.mul(price);
+        const value = unitAmount.multipliedBy(price);
         return utils.format(value, constants.NUMERAL_USD_FORMAT);
     },
     openUrl(url: string): void {
@@ -421,6 +416,10 @@ export const utils = {
             return BrowserType.Firefox;
         } else if (bowser.opera) {
             return BrowserType.Opera;
+        } else if (bowser.msedge) {
+            return BrowserType.Edge;
+        } else if (bowser.safari) {
+            return BrowserType.Safari;
         } else {
             return BrowserType.Other;
         }
@@ -443,7 +442,7 @@ export const utils = {
         }
     },
     isTokenTracked(token: Token): boolean {
-        return !_.isUndefined(token.trackedTimestamp);
+        return token.trackedTimestamp !== undefined;
     },
     // Returns a [downloadLink, isOnMobile] tuple.
     getBestWalletDownloadLinkAndIsMobile(): [string, boolean] {
@@ -454,14 +453,14 @@ export const utils = {
         if (isOnMobile) {
             switch (operatingSystem) {
                 case OperatingSystemType.Android:
-                    downloadLink = constants.URL_TOSHI_ANDROID_APP_STORE;
+                    downloadLink = constants.URL_COINBASE_WALLET_ANDROID_APP_STORE;
                     break;
                 case OperatingSystemType.iOS:
-                    downloadLink = constants.URL_TOSHI_IOS_APP_STORE;
+                    downloadLink = constants.URL_COINBASE_WALLET_IOS_APP_STORE;
                     break;
                 default:
-                    // Toshi is only supported on these mobile OSes - just default to iOS
-                    downloadLink = constants.URL_TOSHI_IOS_APP_STORE;
+                    // Coinbase wallet is only supported on these mobile OSes - just default to iOS
+                    downloadLink = constants.URL_COINBASE_WALLET_IOS_APP_STORE;
             }
         } else {
             switch (browserType) {

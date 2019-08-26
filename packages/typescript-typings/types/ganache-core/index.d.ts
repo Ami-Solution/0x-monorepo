@@ -1,5 +1,5 @@
 declare module 'ganache-core' {
-    import { Provider } from 'ethereum-types';
+    import EthereumTypes = require('ethereum-types');
     export interface GanacheOpts {
         verbose?: boolean;
         logger?: {
@@ -10,7 +10,8 @@ declare module 'ganache-core' {
         networkId?: number;
         mnemonic?: string;
         gasLimit?: number;
+        vmErrorsOnRPCResponse?: boolean;
+        db_path?: string;
     }
-    // tslint:disable-next-line:completed-docs
-    export function provider(opts: GanacheOpts): Provider;
+    export function provider(opts: GanacheOpts): EthereumTypes.Provider;
 }

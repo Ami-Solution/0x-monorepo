@@ -1,4 +1,4 @@
-import { BigNumber } from '@0xproject/utils';
+import { BigNumber } from '@0x/utils';
 
 export const utils = {
     getSignatureTypeIndexIfExists(signature: string): number {
@@ -10,13 +10,13 @@ export const utils = {
     },
     getCurrentUnixTimestampSec(): BigNumber {
         const milisecondsInSecond = 1000;
-        return new BigNumber(Date.now() / milisecondsInSecond).round();
+        return new BigNumber(Date.now() / milisecondsInSecond).integerValue();
     },
-    getPartialAmount(numerator: BigNumber, denominator: BigNumber, target: BigNumber): BigNumber {
+    getPartialAmountFloor(numerator: BigNumber, denominator: BigNumber, target: BigNumber): BigNumber {
         const fillMakerTokenAmount = numerator
-            .mul(target)
+            .multipliedBy(target)
             .div(denominator)
-            .round(0);
+            .integerValue(0);
         return fillMakerTokenAmount;
     },
 };

@@ -5,7 +5,129 @@ Edit the package's CHANGELOG.json file only.
 
 CHANGELOG
 
-## v1.0.1-rc.4 - _August 13, 2018_
+## v2.4.0 - _July 13, 2019_
+
+    * Add MarketOperation type (#1914)
+
+## v2.3.0 - _Invalid date_
+
+    * Add StaticCallProxy types (#1863)
+    * Add `InvalidStaticCallDataOffset`, `TargetNotEven`, `UnexpectedStaticCallResult`, and `InvalidAssetDataEnd` to `RevertReason` enum (#1863)
+
+## v2.2.2 - _April 11, 2019_
+
+    * Dependencies updated
+
+## v2.2.1 - _March 21, 2019_
+
+    * Dependencies updated
+
+## v2.2.0 - _March 20, 2019_
+
+    * Added ERC1155 revert reasons (#1657)
+    * Added `ERC1155AssetData`, `ERC1155AssetDataNoProxyId`, and `ERC1155AssetDataAbi` (#1661)
+    * Add `InvalidOrigin` revert reason (#1668)
+    * Add `RevertReason.SignatureInvalid` thrown by Coordinator (#1705)
+    * Add `RevertReason.InvalidFreeMemoryPtr` thrown by LibAddressArray (#1712)
+
+## v2.1.1 - _February 26, 2019_
+
+    * Dependencies updated
+
+## v2.1.0 - _February 25, 2019_
+
+    * Add `FromLessThanToRequired` and `ToLessThanLengthRequired` revert reasons (#1604)
+
+## v2.0.2 - _February 7, 2019_
+
+    * Dependencies updated
+
+## v2.0.1 - _February 6, 2019_
+
+    * Dependencies updated
+
+## v2.0.0 - _February 5, 2019_
+
+    * Upgrade the bignumber.js to v8.0.2 (#1517)
+    * Update `ZeroExTransaction` type and add `SignedZeroExTransaction` type (#1576)
+    * Add `EIP712DomainWithDefaultSchema` type (#1576)
+
+## v1.5.2 - _January 15, 2019_
+
+    * Dependencies updated
+
+## v1.5.1 - _January 11, 2019_
+
+    * Dependencies updated
+
+## v1.5.0 - _January 9, 2019_
+
+    * Added types for Dutch Auction contract (#1465)
+
+## v1.4.1 - _December 13, 2018_
+
+    * Dependencies updated
+
+## v1.4.0 - _December 11, 2018_
+
+    * Add `LengthMismatch` and `LengthGreaterThan3Required` revert reasons (#1224)
+    * Add RevertReasons for DutchAuction contract (#1225)
+    * Add MultiAsset types (#1363)
+
+## v1.3.0 - _November 21, 2018_
+
+    * Add the `SimpleContractArtifact` type, which describes the artifact format published in the `@0x/contract-artifacts` package (#1298)
+
+## v1.2.1 - _November 9, 2018_
+
+    * Dependencies updated
+
+## v1.2.0 - _October 18, 2018_
+
+    * Added `EIP712Parameter` `EIP712Types` `EIP712TypedData` for EIP712 signing (#1102)
+    * Added `ZeroExTransaction` type for Exchange executeTransaction (#1102)
+    * Add `AssetData` union type (`type AssetData = ERC20AssetData | ERC721AssetData`) (#1131)
+
+## v1.1.4 - _October 4, 2018_
+
+    * Dependencies updated
+
+## v1.1.3 - _October 2, 2018_
+
+    * Dependencies updated
+
+## v1.1.2 - _September 28, 2018_
+
+    * Dependencies updated
+
+## v1.1.1 - _September 25, 2018_
+
+    * Dependencies updated
+
+## v1.1.0 - _September 25, 2018_
+
+    * Add ObjectMap type (#1037)
+    * Add SRA types from connect (#1085)
+
+## v1.0.2 - _September 21, 2018_
+
+    * Dependencies updated
+
+## v1.0.1 - _September 5, 2018_
+
+    * Add AssetProxyOwner revert reasons (#1041)
+    * Add MultiSigWalletWithTimeLock revert reasons (#1050)
+
+## v1.0.1-rc.6 - _August 27, 2018_
+
+    * Add WalletError and ValidatorError revert reasons (#1012)
+    * Remove Caller and Trezor SignatureTypes (#1015)
+
+## v1.0.1-rc.5 - _August 24, 2018_
+
+    * Add revert reasons for ERC721Token (#933)
+
+## v1.0.1-rc.4 - _August 14, 2018_
 
     * Added SignerType to handle different signing prefix scenarios (#914)
 

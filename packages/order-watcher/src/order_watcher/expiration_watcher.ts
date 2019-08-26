@@ -1,4 +1,4 @@
-import { BigNumber, intervalUtils } from '@0xproject/utils';
+import { BigNumber, intervalUtils } from '@0x/utils';
 import { RBTree } from 'bintrees';
 import * as _ from 'lodash';
 
@@ -38,7 +38,7 @@ export class ExpirationWatcher {
         this._orderHashByExpirationRBTree = new RBTree(comparator);
     }
     public subscribe(callback: (orderHash: string) => void): void {
-        if (!_.isUndefined(this._orderExpirationCheckingIntervalIdIfExists)) {
+        if (this._orderExpirationCheckingIntervalIdIfExists !== undefined) {
             throw new Error(OrderWatcherError.SubscriptionAlreadyPresent);
         }
         this._orderExpirationCheckingIntervalIdIfExists = intervalUtils.setInterval(
@@ -48,7 +48,7 @@ export class ExpirationWatcher {
         );
     }
     public unsubscribe(): void {
-        if (_.isUndefined(this._orderExpirationCheckingIntervalIdIfExists)) {
+        if (this._orderExpirationCheckingIntervalIdIfExists === undefined) {
             throw new Error(OrderWatcherError.SubscriptionNotFound);
         }
         intervalUtils.clearInterval(this._orderExpirationCheckingIntervalIdIfExists);
@@ -59,7 +59,7 @@ export class ExpirationWatcher {
         this._orderHashByExpirationRBTree.insert(orderHash);
     }
     public removeOrder(orderHash: string): void {
-        if (_.isUndefined(this._expiration[orderHash])) {
+        if (this._expiration[orderHash] === undefined) {
             return; // noop since order already removed
         }
         this._orderHashByExpirationRBTree.remove(orderHash);
@@ -73,10 +73,10 @@ export class ExpirationWatcher {
                 break;
             }
             const nextOrderHashToExpire = this._orderHashByExpirationRBTree.min();
-            const hasNoExpiredOrders = this._expiration[nextOrderHashToExpire].greaterThan(
+            const hasNoExpiredOrders = this._expiration[nextOrderHashToExpire].isGreaterThan(
                 currentUnixTimestampMs.plus(this._expirationMarginMs),
             );
-            const isSubscriptionActive = _.isUndefined(this._orderExpirationCheckingIntervalIdIfExists);
+            const isSubscriptionActive = this._orderExpirationCheckingIntervalIdIfExists === undefined;
             if (hasNoExpiredOrders || isSubscriptionActive) {
                 break;
             }

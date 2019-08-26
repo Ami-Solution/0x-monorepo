@@ -27,13 +27,13 @@ yarn install
 To build this package and all other monorepo packages that it depends on, run the following from the monorepo root directory:
 
 ```bash
-PKG=@0xproject/migrations yarn build
+PKG=@0x/migrations yarn build
 ```
 
 Or continuously rebuild on change:
 
 ```bash
-PKG=@0xproject/migrations yarn watch
+PKG=@0x/migrations yarn watch
 ```
 
 ### Clean
@@ -50,33 +50,55 @@ yarn lint
 
 ### Migrate
 
-#### V2-beta smart contracts
+#### V2 smart contracts
 
-In order to migrate the V2-beta 0x smart contracts to Kovan using a Ledger Nano S, run:
-
-```bash
-yarn migrate:v2-beta-testnet
-```
-
-**Note:** Ledger settings `contract data` must be `on`, and `browser support` must be set to `off`.
-
-Post-publish steps:
-
-1.  Since we don't re-deploy the `WETH9` nor `ZRXToken` contracts, manually copy over the artifacts for them from `2.0.0` into `2.0.0-beta-testnet` and add the Kovan & ganache addresses to both of their `networks` sections.
-2.  We now need to copy over the network `50` settings from the `2.0.0` artifacts to the `2.0.0-beta-testnet` artifacts for the newly deployed contracts (e.g `Exchange`, `ERC20Proxy`, `ERC721Proxy` and `AssetProxyOwner`)
-
-#### V2 (under development) smart contracts
-
-In order to migrate the V2 (under development) 0x smart contracts to TestRPC/Ganache running at `http://localhost:8545`, run:
+In order to migrate the V2 0x smart contracts to TestRPC/Ganache running at `http://localhost:8545`, run:
 
 ```bash
 yarn migrate:v2
 ```
 
-#### V1 smart contracts
+### Publish
 
-In order to migrate the V1 0x smart contracts to TestRPC/Ganache running at `http://localhost:8545`, run:
+#### 0x Ganache Snapshot
+
+The 0x Ganache snapshot can be generated and published in this package. In order to build the snapshot for this version of migrations run:
 
 ```bash
-yarn migrate:v1
+yarn build:snapshot
 ```
+
+This will run the migrations in Ganache and output a zip file to be uploaded to the s3 bucket. For example, after running this command you will have created `0x_ganache_snapshot-2.2.2.zip`. To publish the zip file to the s3 bucket run:
+
+```bash
+yarn publish:snapshot
+```
+
+This snapshot will now be publicly available at http://ganache-snapshots.0x.org.s3.amazonaws.com/0x_ganache_snapshot-latest.zip and also versioned with the package.json version.
+
+#### 0x Ganache Docker Image
+
+We also publish a simple docker image which downloads the latest snapshot, extracts and runs Ganache. This is not required to be built when migrations change as it always downloads and runs the latest zip file. If you have made changes to the Dockerfile then a publish of the image is required. To do this run:
+
+```bash
+yarn build:snapshot:docker
+yarn publish:snapshot:docker
+```
+
+The result is a published docker image to the 0xorg docker registry. To start the docker image run:
+
+```bash
+docker run -p 8545:8545 -ti 0xorg/ganache-cli:latest
+```
+
+This will pull the latest zip in the s3 bucket, extract and start Ganache with the snapshot.
+
+In the event you need a specific version of the published Ganache snapshot run the following specifying the VERSION environment variable:
+
+```bash
+docker run -e VERSION=2.2.2 -p 8545:8545 -ti 0xorg/ganache-cli:latest
+```
+
+#### Production
+
+If deploying contract changes to mainnet, `@0x/contract-artifacts` should also be updated and published. The artifacts must be copied from each `contracts/{package-name}/generated-artifacts/{contract}.json`.

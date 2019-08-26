@@ -10,6 +10,7 @@ export interface ImageProps {
     height?: string | number;
     maxWidth?: string | number;
     maxHeight?: string | number;
+    additionalStyle?: React.CSSProperties;
 }
 interface ImageState {
     imageLoadFailed: boolean;
@@ -23,13 +24,14 @@ export class Image extends React.Component<ImageProps, ImageState> {
     }
     public render(): React.ReactNode {
         const src =
-            this.state.imageLoadFailed || _.isUndefined(this.props.src) ? this.props.fallbackSrc : this.props.src;
+            this.state.imageLoadFailed || this.props.src === undefined ? this.props.fallbackSrc : this.props.src;
         return (
             <img
                 className={this.props.className}
                 onError={this._onError.bind(this)}
                 src={src}
                 style={{
+                    ...this.props.additionalStyle,
                     borderRadius: this.props.borderRadius,
                     maxWidth: this.props.maxWidth,
                     maxHeight: this.props.maxHeight,

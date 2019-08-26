@@ -1,5 +1,5 @@
-import { logUtils } from '@0xproject/utils';
-import { NodeType, Web3Wrapper } from '@0xproject/web3-wrapper';
+import { logUtils } from '@0x/utils';
+import { NodeType, Web3Wrapper } from '@0x/web3-wrapper';
 import * as _ from 'lodash';
 
 // HACK(albrow): 🐉 We have to do this so that debug.setHead works correctly.
@@ -72,7 +72,7 @@ export class BlockchainLifecycle {
         logUtils.warn('Done mining the minimum number of blocks.');
     }
     private async _getNodeTypeAsync(): Promise<NodeType> {
-        if (_.isUndefined(this._nodeType)) {
+        if (this._nodeType === undefined) {
             this._nodeType = await this._web3Wrapper.getNodeTypeAsync();
         }
         return this._nodeType;

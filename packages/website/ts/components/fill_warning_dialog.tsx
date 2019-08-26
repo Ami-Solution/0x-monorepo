@@ -1,4 +1,4 @@
-import { colors } from '@0xproject/react-shared';
+import { colors } from '@0x/react-shared';
 import Dialog from 'material-ui/Dialog';
 import FlatButton from 'material-ui/FlatButton';
 import * as React from 'react';
@@ -18,12 +18,12 @@ export const FillWarningDialog = (props: FillWarningDialogProps) => {
                 <FlatButton
                     key="fillWarningCancel"
                     label="Cancel"
-                    onTouchTap={() => props.onToggleDialog(didCancel)} // tslint:disable-line:jsx-no-lambda
+                    onClick={() => props.onToggleDialog(didCancel)} // tslint:disable-line:jsx-no-lambda
                 />,
                 <FlatButton
                     key="fillWarningContinue"
                     label="Fill Order"
-                    onTouchTap={() => props.onToggleDialog(!didCancel)} // tslint:disable-line:jsx-no-lambda
+                    onClick={() => props.onToggleDialog(!didCancel)} // tslint:disable-line:jsx-no-lambda
                 />,
             ]}
             open={props.isOpen}
@@ -35,9 +35,10 @@ export const FillWarningDialog = (props: FillWarningDialogProps) => {
                 <div>
                     At least one of the tokens in this order was not found in the token registry smart contract and may
                     be counterfeit. It is your responsibility to verify the token addresses on Etherscan (
-                    <a href="https://0xproject.com/wiki#Verifying-Custom-Tokens" target="_blank">
+                    <a href="https://0x.org/wiki#Verifying-Custom-Tokens" target="_blank">
                         See this how-to guide
-                    </a>) before filling an order. <b>This action may result in the loss of funds</b>.
+                    </a>
+                    ) before filling an order. <b>This action may result in the loss of funds</b>.
                 </div>
             </div>
         </Dialog>

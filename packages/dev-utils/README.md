@@ -16,15 +16,30 @@ Boolean env variables should be either `true` or `false`. Defaults to `false` if
 ## Install
 
 ```bash
-yarn add @0xproject/dev-utils
+yarn add @0x/dev-utils
 ```
 
 If your project is in [TypeScript](https://www.typescriptlang.org/), add the following to your `tsconfig.json`:
 
 ```json
 "compilerOptions": {
-    "typeRoots": ["node_modules/@0xproject/typescript-typings/types", "node_modules/@types"],
+    "typeRoots": ["node_modules/@0x/typescript-typings/types", "node_modules/@types"],
 }
+```
+
+## Troubleshooting
+
+If you are still seeing TS type errors complaining about missing DOM types such as `Response`:
+
+```
+error TS2304: Cannot find name 'Response'.
+```
+
+Then you need to explicitly add the `dom` lib to your compiler options in `tsconfig.json`. The `dom` library is included by default, but customizing the `lib` option can cause it to be dropped.
+
+```
+"compilerOptions": {
+    "lib": [..., "dom"],
 ```
 
 ## Contributing
@@ -52,13 +67,13 @@ yarn install
 To build this package and all other monorepo packages that it depends on, run the following from the monorepo root directory:
 
 ```bash
-PKG=@0xproject/dev-utils yarn build
+PKG=@0x/dev-utils yarn build
 ```
 
 Or continuously rebuild on change:
 
 ```bash
-PKG=@0xproject/dev-utils yarn watch
+PKG=@0x/dev-utils yarn watch
 ```
 
 ### Clean

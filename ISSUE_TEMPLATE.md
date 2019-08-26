@@ -2,7 +2,7 @@
 
 <!--- Before submitting please check to see if this issue was already reported -->
 
-<!--- Provide a general summary of the issue in the Title above -->
+<!--- Prefix your issue title with the package name it relates to (e.g., `0x.js: ` or `general:`) -->
 
 ## Expected Behavior
 
@@ -46,10 +46,14 @@
 
 <!--- Include as many relevant details about the environment you experienced the bug in -->
 
-|             Package | Version |
-| ------------------: | :------ |
-|             `0x.js` | 0.25.0  |
-| `Exchange Contract` | v1      |
+| Package | Version |
+| ------: | :------ |
+
+
+<!-- For example:
+|             `0x.js` | 2.0.4   |
+| `Exchange Contract` | v2      |
+-->
 
 | Network |
 | ------- |

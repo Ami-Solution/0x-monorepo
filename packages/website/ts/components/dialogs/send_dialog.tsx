@@ -1,4 +1,4 @@
-import { BigNumber } from '@0xproject/utils';
+import { BigNumber } from '@0x/utils';
 import * as _ from 'lodash';
 import Dialog from 'material-ui/Dialog';
 import FlatButton from 'material-ui/FlatButton';
@@ -38,13 +38,13 @@ export class SendDialog extends React.Component<SendDialogProps, SendDialogState
     }
     public render(): React.ReactNode {
         const transferDialogActions = [
-            <FlatButton key="cancelTransfer" label="Cancel" onTouchTap={this._onCancel.bind(this)} />,
+            <FlatButton key="cancelTransfer" label="Cancel" onClick={this._onCancel.bind(this)} />,
             <FlatButton
                 key="sendTransfer"
                 disabled={this._hasErrors()}
                 label="Send"
                 primary={true}
-                onTouchTap={this._onSendClick.bind(this)}
+                onClick={this._onSendClick.bind(this)}
             />,
         ];
         return (
@@ -132,6 +132,6 @@ export class SendDialog extends React.Component<SendDialogProps, SendDialogState
         this.props.onCancelled();
     }
     private _hasErrors(): boolean {
-        return _.isUndefined(this.state.recipient) || _.isUndefined(this.state.value) || !this.state.isAmountValid;
+        return this.state.recipient === undefined || this.state.value === undefined || !this.state.isAmountValid;
     }
 }

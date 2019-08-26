@@ -5,7 +5,144 @@ Edit the package's CHANGELOG.json file only.
 
 CHANGELOG
 
-## v1.0.5 - _August 13, 2018_
+## v4.1.1 - _July 13, 2019_
+
+    * Fix bug in Trezor subprovider causing Trezor response to not be hex encoded (#1867)
+
+## v4.1.0 - _May 24, 2019_
+
+    * Improve performance of Trezor subprovider via caching (#1830)
+    * Add Trezor handware wallet subprovider (#1431)
+
+## v4.0.6 - _May 10, 2019_
+
+    * Dependencies updated
+
+## v4.0.5 - _April 11, 2019_
+
+    * Dependencies updated
+
+## v4.0.4 - _March 21, 2019_
+
+    * Dependencies updated
+
+## v4.0.3 - _March 20, 2019_
+
+    * Update ganache-core to 2.5.3 (#1707)
+
+## v4.0.2 - _March 1, 2019_
+
+    * Dependencies updated
+
+## v4.0.1 - _February 26, 2019_
+
+    * Dependencies updated
+
+## v4.0.0 - _February 25, 2019_
+
+    * Add support for EIP1193 providers & Web3.js providers >= 1.0-beta.38 (#1627)
+    * Update provider params to type SupportedProvider which outlines all supported providers (#1627)
+
+## v3.0.3 - _February 9, 2019_
+
+    * Dependencies updated
+
+## v3.0.2 - _February 7, 2019_
+
+    * Dependencies updated
+
+## v3.0.1 - _February 6, 2019_
+
+    * Dependencies updated
+
+## v3.0.0 - _February 5, 2019_
+
+    * Upgrade the bignumber.js to v8.0.2 (#1517)
+    * Update ganache-core to v2.3.3 (#1518)
+
+## v2.1.11 - _January 15, 2019_
+
+    * Dependencies updated
+
+## v2.1.10 - _January 11, 2019_
+
+    * Dependencies updated
+
+## v2.1.9 - _January 9, 2019_
+
+    * Dependencies updated
+
+## v2.1.8 - _December 13, 2018_
+
+    * Dependencies updated
+
+## v2.1.7 - _December 11, 2018_
+
+    * Dependencies updated
+
+## v2.1.6 - _November 28, 2018_
+
+    * Dependencies updated
+
+## v2.1.5 - _November 21, 2018_
+
+    * Dependencies updated
+
+## v2.1.4 - _November 14, 2018_
+
+    * Dependencies updated
+
+## v2.1.3 - _November 13, 2018_
+
+    * Dependencies updated
+
+## v2.1.2 - _November 12, 2018_
+
+    * Dependencies updated
+
+## v2.1.1 - _November 9, 2018_
+
+    * Dependencies updated
+
+## v2.1.0 - _October 18, 2018_
+
+    * Add `MetamaskSubprovider` to handle inconsistent JSON RPC behaviour (#1102)
+    * Add support for `eth_signTypedData` in wallets Mnemonic, Private and EthLightWallet (#1102)
+    * Make web3-provider-engine types a 'dependency' so it's available to users of the library (#1105)
+
+## v2.0.7 - _October 4, 2018_
+
+    * Dependencies updated
+
+## v2.0.6 - _September 28, 2018_
+
+    * Dependencies updated
+
+## v2.0.5 - _September 25, 2018_
+
+    * Dependencies updated
+
+## v2.0.4 - _September 25, 2018_
+
+    * Dependencies updated
+
+## v2.0.3 - _September 21, 2018_
+
+    * Dependencies updated
+
+## v2.0.2 - _September 5, 2018_
+
+    * Dependencies updated
+
+## v2.0.1 - _August 27, 2018_
+
+    * Dependencies updated
+
+## v2.0.0 - _August 24, 2018_
+
+    * Export types: `PartialTxParams`, `JSONRPCRequestPayloadWithMethod`, `ECSignatureString`, `AccountFetchingConfigs`, `LedgerEthereumClientFactoryAsync`, `OnNextCompleted`, `MnemonicWalletSubproviderConfigs`, LedgerGetAddressResult, `JSONRPCRequestPayload`, `Provider`, `JSONRPCResponsePayload` and `JSONRPCErrorCallback` (#924)
+
+## v1.0.5 - _August 14, 2018_
 
     * Dependencies updated
 

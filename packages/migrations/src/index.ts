@@ -1,3 +1,20 @@
-export { runV1MigrationsAsync } from './1.0.0/migration';
-export { runV2MigrationsAsync } from './2.0.0/migration';
-export { runV2TestnetMigrationsAsync } from './2.0.0-beta-testnet/migration';
+export {
+    TxData,
+    TxDataPayable,
+    SupportedProvider,
+    Web3JsProvider,
+    GanacheProvider,
+    EIP1193Provider,
+    ZeroExProvider,
+    EIP1193Event,
+    JSONRPCErrorCallback,
+    Web3JsV1Provider,
+    Web3JsV2Provider,
+    Web3JsV3Provider,
+    JSONRPCRequestPayload,
+    JSONRPCResponsePayload,
+    JSONRPCResponseError,
+} from 'ethereum-types';
+export { ContractAddresses } from '@0x/contract-addresses';
+export { runMigrationsAsync, runMigrationsOnceAsync } from './migration';
+export import Web3ProviderEngine = require('web3-provider-engine');

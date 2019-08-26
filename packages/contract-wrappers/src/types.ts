@@ -1,25 +1,28 @@
-import { BigNumber } from '@0xproject/utils';
+import {
+    ERC20TokenEventArgs,
+    ERC20TokenEvents,
+    ERC721TokenEventArgs,
+    ERC721TokenEvents,
+    ExchangeEventArgs,
+    ExchangeEvents,
+    WETH9EventArgs,
+    WETH9Events,
+} from '@0x/abi-gen-wrappers';
+import { ContractAddresses } from '@0x/contract-addresses';
+import { OrderState, SignedOrder } from '@0x/types';
+import { BigNumber } from '@0x/utils';
 
-import { OrderState, SignedOrder } from '@0xproject/types';
 import { BlockParam, ContractEventArg, DecodedLogArgs, LogEntryEvent, LogWithDecodedArgs } from 'ethereum-types';
-
-import { ERC20TokenEventArgs, ERC20TokenEvents } from './contract_wrappers/generated/erc20_token';
-import { ERC721TokenEventArgs, ERC721TokenEvents } from './contract_wrappers/generated/erc721_token';
-import { ExchangeEventArgs, ExchangeEvents } from './contract_wrappers/generated/exchange';
-import { WETH9EventArgs, WETH9Events } from './contract_wrappers/generated/weth9';
 
 export enum ExchangeWrapperError {
     AssetDataMismatch = 'ASSET_DATA_MISMATCH',
 }
 
+export enum ForwarderWrapperError {
+    CompleteFillFailed = 'COMPLETE_FILL_FAILED',
+}
+
 export enum ContractWrappersError {
-    ExchangeContractDoesNotExist = 'EXCHANGE_CONTRACT_DOES_NOT_EXIST',
-    ZRXContractDoesNotExist = 'ZRX_CONTRACT_DOES_NOT_EXIST',
-    EtherTokenContractDoesNotExist = 'ETHER_TOKEN_CONTRACT_DOES_NOT_EXIST',
-    ERC20ProxyContractDoesNotExist = 'ERC20_PROXY_CONTRACT_DOES_NOT_EXIST',
-    ERC721ProxyContractDoesNotExist = 'ERC721_PROXY_CONTRACT_DOES_NOT_EXIST',
-    ERC20TokenContractDoesNotExist = 'ERC20_TOKEN_CONTRACT_DOES_NOT_EXIST',
-    ERC721TokenContractDoesNotExist = 'ERC721_TOKEN_CONTRACT_DOES_NOT_EXIST',
     ContractNotDeployedOnNetwork = 'CONTRACT_NOT_DEPLOYED_ON_NETWORK',
     InsufficientAllowanceForTransfer = 'INSUFFICIENT_ALLOWANCE_FOR_TRANSFER',
     InsufficientBalanceForTransfer = 'INSUFFICIENT_BALANCE_FOR_TRANSFER',
@@ -31,6 +34,7 @@ export enum ContractWrappersError {
     SubscriptionAlreadyPresent = 'SUBSCRIPTION_ALREADY_PRESENT',
     ERC721OwnerNotFound = 'ERC_721_OWNER_NOT_FOUND',
     ERC721NoApproval = 'ERC_721_NO_APPROVAL',
+    SignatureRequestDenied = 'SIGNATURE_REQUEST_DENIED',
 }
 
 export enum InternalContractWrappersError {
@@ -105,33 +109,33 @@ export type SyncMethod = (...args: any[]) => any;
 /**
  * networkId: The id of the underlying ethereum network your provider is connected to. (1-mainnet, 3-ropsten, 4-rinkeby, 42-kovan, 50-testrpc)
  * gasPrice: Gas price to use with every transaction
- * exchangeContractAddress: The address of an exchange contract to use
- * zrxContractAddress: The address of the ZRX contract to use
- * erc20ProxyContractAddress: The address of the erc20 token transfer proxy contract to use
- * erc721ProxyContractAddress: The address of the erc721 token transfer proxy contract to use
- * forwarderContractAddress: The address of the forwarder contract to use
- * orderWatcherConfig: All the configs related to the orderWatcher
+ * contractAddresses: The address of all contracts to use. Defaults to the known addresses based on networkId.
  * blockPollingIntervalMs: The interval to use for block polling in event watching methods (defaults to 1000)
  */
 export interface ContractWrappersConfig {
     networkId: number;
     gasPrice?: BigNumber;
-    exchangeContractAddress?: string;
-    zrxContractAddress?: string;
-    erc20ProxyContractAddress?: string;
-    erc721ProxyContractAddress?: string;
-    forwarderContractAddress?: string;
+    contractAddresses?: ContractAddresses;
     blockPollingIntervalMs?: number;
 }
 
 /**
- * expectedFillTakerTokenAmount: If specified, the validation method will ensure that the
- * supplied order maker has a sufficient allowance/balance to fill this amount of the order's
- * takerTokenAmount. If not specified, the validation method ensures that the maker has a sufficient
- * allowance/balance to fill the entire remaining order amount.
+ * `expectedFillTakerTokenAmount`: If specified, the validation method will ensure that the supplied order maker has a sufficient
+ *                               allowance/balance to fill this amount of the order's takerTokenAmount.
+ *
+ * `validateRemainingOrderAmountIsFillable`: The validation method ensures that the maker has sufficient allowance/balance to fill
+ *                                         the entire remaining order amount. If this option is set to false, the balances
+ *                                         and allowances are calculated to determine the order is fillable for a
+ *                                         non-zero amount (some value less than or equal to the order remaining amount).
+ *                                         We call such orders "partially fillable orders". Default is `true`.
+ *
+ * `simulationTakerAddress`: During the maker transfer simulation, tokens are sent from the maker to the `simulationTakerAddress`. This defaults
+ *                           to the `takerAddress` specified in the order. Some tokens prevent transfer to the NULL address so this address can be specified.
  */
 export interface ValidateOrderFillableOpts {
     expectedFillTakerTokenAmount?: BigNumber;
+    validateRemainingOrderAmountIsFillable?: boolean;
+    simulationTakerAddress?: string;
 }
 
 /**
@@ -147,10 +151,12 @@ export interface MethodOpts {
 /**
  * gasPrice: Gas price in Wei to use for a transaction
  * gasLimit: The amount of gas to send with a transaction (in Gwei)
+ * nonce: The nonce to use for a transaction. If not specified, it defaults to the next incremented nonce.
  */
 export interface TransactionOpts {
     gasPrice?: BigNumber;
     gasLimit?: number;
+    nonce?: number;
 }
 
 /**
@@ -180,11 +186,44 @@ export interface OrderInfo {
 }
 
 export enum OrderStatus {
-    INVALID = 0,
-    INVALID_MAKER_ASSET_AMOUNT,
-    INVALID_TAKER_ASSET_AMOUNT,
-    FILLABLE,
-    EXPIRED,
-    FULLY_FILLED,
-    CANCELLED,
+    Invalid = 0,
+    InvalidMakerAssetAmount,
+    InvalidTakerAssetAmount,
+    Fillable,
+    Expired,
+    FullyFilled,
+    Cancelled,
+}
+
+export interface TraderInfo {
+    makerBalance: BigNumber;
+    makerAllowance: BigNumber;
+    takerBalance: BigNumber;
+    takerAllowance: BigNumber;
+    makerZrxBalance: BigNumber;
+    makerZrxAllowance: BigNumber;
+    takerZrxBalance: BigNumber;
+    takerZrxAllowance: BigNumber;
+}
+
+export interface OrderAndTraderInfo {
+    orderInfo: OrderInfo;
+    traderInfo: TraderInfo;
+}
+
+export interface BalanceAndAllowance {
+    balance: BigNumber;
+    allowance: BigNumber;
+}
+
+export enum DutchAuctionWrapperError {
+    AssetDataMismatch = 'ASSET_DATA_MISMATCH',
+}
+
+export { CoordinatorServerCancellationResponse, CoordinatorServerError } from './utils/coordinator_server_types';
+
+export interface CoordinatorTransaction {
+    salt: BigNumber;
+    signerAddress: string;
+    data: string;
 }

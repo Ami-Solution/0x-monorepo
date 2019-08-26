@@ -1,13 +1,14 @@
-import { ZeroEx } from '0x.js';
-import { BigNumber, logUtils } from '@0xproject/utils';
-import { Web3Wrapper } from '@0xproject/web3-wrapper';
+import { ERC20TokenWrapper } from '0x.js';
+import { BigNumber, logUtils } from '@0x/utils';
+import { Web3Wrapper } from '@0x/web3-wrapper';
 import * as _ from 'lodash';
 
 import { configs } from './configs';
+import { TOKENS_BY_NETWORK } from './tokens';
 
 const DISPENSE_AMOUNT_ETHER = 0.1;
-const DISPENSE_AMOUNT_TOKEN = 0.1;
-const DISPENSE_MAX_AMOUNT_TOKEN = 2;
+const DISPENSE_AMOUNT_TOKEN = 1;
+const DISPENSE_MAX_AMOUNT_TOKEN = 100;
 const DISPENSE_MAX_AMOUNT_ETHER = 2;
 
 type AsyncTask = () => Promise<void>;
@@ -18,7 +19,7 @@ export const dispenseAssetTasks = {
             logUtils.log(`Processing ETH ${recipientAddress}`);
             const userBalance = await web3Wrapper.getBalanceInWeiAsync(recipientAddress);
             const maxAmountInWei = Web3Wrapper.toWei(new BigNumber(DISPENSE_MAX_AMOUNT_ETHER));
-            if (userBalance.greaterThanOrEqualTo(maxAmountInWei)) {
+            if (userBalance.isGreaterThanOrEqualTo(maxAmountInWei)) {
                 logUtils.log(
                     `User exceeded ETH balance maximum (${maxAmountInWei}) ${recipientAddress} ${userBalance} `,
                 );
@@ -32,33 +33,41 @@ export const dispenseAssetTasks = {
             logUtils.log(`Sent ${DISPENSE_AMOUNT_ETHER} ETH to ${recipientAddress} tx: ${txHash}`);
         };
     },
-    dispenseTokenTask(recipientAddress: string, tokenSymbol: string, zeroEx: ZeroEx): AsyncTask {
+    dispenseTokenTask(
+        recipientAddress: string,
+        tokenSymbol: string,
+        networkId: number,
+        erc20TokenWrapper: ERC20TokenWrapper,
+    ): AsyncTask {
         return async () => {
             logUtils.log(`Processing ${tokenSymbol} ${recipientAddress}`);
             const amountToDispense = new BigNumber(DISPENSE_AMOUNT_TOKEN);
-            const token = await zeroEx.tokenRegistry.getTokenBySymbolIfExistsAsync(tokenSymbol);
-            if (_.isUndefined(token)) {
+            const tokenIfExists = _.get(TOKENS_BY_NETWORK, [networkId, tokenSymbol]);
+            if (tokenIfExists === undefined) {
                 throw new Error(`Unsupported asset type: ${tokenSymbol}`);
             }
-            const baseUnitAmount = ZeroEx.toBaseUnitAmount(amountToDispense, token.decimals);
-            const userBalanceBaseUnits = await zeroEx.token.getBalanceAsync(token.address, recipientAddress);
-            const maxAmountBaseUnits = ZeroEx.toBaseUnitAmount(
-                new BigNumber(DISPENSE_MAX_AMOUNT_TOKEN),
-                token.decimals,
+            const baseUnitAmount = Web3Wrapper.toBaseUnitAmount(amountToDispense, tokenIfExists.decimals);
+            const userBalanceBaseUnits = await erc20TokenWrapper.getBalanceAsync(
+                tokenIfExists.address,
+                recipientAddress,
             );
-            if (userBalanceBaseUnits.greaterThanOrEqualTo(maxAmountBaseUnits)) {
+            const maxAmountBaseUnits = Web3Wrapper.toBaseUnitAmount(
+                new BigNumber(DISPENSE_MAX_AMOUNT_TOKEN),
+                tokenIfExists.decimals,
+            );
+            if (userBalanceBaseUnits.isGreaterThanOrEqualTo(maxAmountBaseUnits)) {
                 logUtils.log(
                     `User exceeded token balance maximum (${maxAmountBaseUnits}) ${recipientAddress} ${userBalanceBaseUnits} `,
                 );
                 return;
             }
-            const txHash = await zeroEx.token.transferAsync(
-                token.address,
+            const txHash = await erc20TokenWrapper.transferAsync(
+                tokenIfExists.address,
                 configs.DISPENSER_ADDRESS,
                 recipientAddress,
                 baseUnitAmount,
             );
-            logUtils.log(`Sent ${amountToDispense} ZRX to ${recipientAddress} tx: ${txHash}`);
+            logUtils.log(`Sent ${amountToDispense} ${tokenSymbol} to ${recipientAddress} tx: ${txHash}`);
         };
     },
 };

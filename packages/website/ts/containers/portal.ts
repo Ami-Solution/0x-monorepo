@@ -1,4 +1,4 @@
-import { BigNumber } from '@0xproject/utils';
+import { BigNumber } from '@0x/utils';
 import * as _ from 'lodash';
 import * as React from 'react';
 import { connect } from 'react-redux';
@@ -6,7 +6,7 @@ import { Dispatch } from 'redux';
 import { Portal as PortalComponent, PortalProps as PortalComponentProps } from 'ts/components/portal/portal';
 import { Dispatcher } from 'ts/redux/dispatcher';
 import { State } from 'ts/redux/reducer';
-import { BlockchainErrs, HashData, Order, ProviderType, ScreenWidths, Side, TokenByAddress } from 'ts/types';
+import { BlockchainErrs, HashData, PortalOrder, ProviderType, ScreenWidths, Side, TokenByAddress } from 'ts/types';
 import { constants } from 'ts/utils/constants';
 import { Translate } from 'ts/utils/translate';
 
@@ -25,7 +25,7 @@ interface ConnectedState {
     screenWidth: ScreenWidths;
     shouldBlockchainErrDialogBeOpen: boolean;
     userAddress: string;
-    userSuppliedOrderCache: Order;
+    userSuppliedOrderCache: PortalOrder;
     flashMessage?: string | React.ReactNode;
     translate: Translate;
     isPortalOnboardingShowing: boolean;
@@ -39,14 +39,10 @@ interface ConnectedDispatch {
 const mapStateToProps = (state: State, _ownProps: PortalComponentProps): ConnectedState => {
     const receiveAssetToken = state.sideToAssetToken[Side.Receive];
     const depositAssetToken = state.sideToAssetToken[Side.Deposit];
-    const receiveAddress = !_.isUndefined(receiveAssetToken.address)
-        ? receiveAssetToken.address
-        : constants.NULL_ADDRESS;
-    const depositAddress = !_.isUndefined(depositAssetToken.address)
-        ? depositAssetToken.address
-        : constants.NULL_ADDRESS;
-    const receiveAmount = !_.isUndefined(receiveAssetToken.amount) ? receiveAssetToken.amount : new BigNumber(0);
-    const depositAmount = !_.isUndefined(depositAssetToken.amount) ? depositAssetToken.amount : new BigNumber(0);
+    const receiveAddress = receiveAssetToken.address !== undefined ? receiveAssetToken.address : constants.NULL_ADDRESS;
+    const depositAddress = depositAssetToken.address !== undefined ? depositAssetToken.address : constants.NULL_ADDRESS;
+    const receiveAmount = receiveAssetToken.amount !== undefined ? receiveAssetToken.amount : new BigNumber(0);
+    const depositAmount = depositAssetToken.amount !== undefined ? depositAssetToken.amount : new BigNumber(0);
     const hashData = {
         depositAmount,
         depositTokenContractAddr: depositAddress,
@@ -87,6 +83,7 @@ const mapDispatchToProps = (dispatch: Dispatch<State>): ConnectedDispatch => ({
     dispatcher: new Dispatcher(dispatch),
 });
 
-export const Portal: React.ComponentClass<PortalComponentProps> = connect(mapStateToProps, mapDispatchToProps)(
-    PortalComponent,
-);
+export const Portal: React.ComponentClass<PortalComponentProps> = connect(
+    mapStateToProps,
+    mapDispatchToProps,
+)(PortalComponent);

@@ -1,13 +1,16 @@
-import { abiUtils, BigNumber } from '@0xproject/utils';
-import { Web3Wrapper } from '@0xproject/web3-wrapper';
+import { assert } from '@0x/assert';
+import { schemas } from '@0x/json-schemas';
+import { AbiEncoder, abiUtils, BigNumber, providerUtils } from '@0x/utils';
+import { Web3Wrapper } from '@0x/web3-wrapper';
 import {
     AbiDefinition,
     AbiType,
+    CallData,
     ConstructorAbi,
     ContractAbi,
     DataItem,
     MethodAbi,
-    Provider,
+    SupportedProvider,
     TxData,
     TxDataPayable,
 } from 'ethereum-types';
@@ -16,12 +19,39 @@ import * as _ from 'lodash';
 
 import { formatABIDataItem } from './utils';
 
-export interface EthersInterfaceByFunctionSignature {
-    [key: string]: ethers.Interface;
+export interface AbiEncoderByFunctionSignature {
+    [key: string]: AbiEncoder.Method;
 }
 
+// tslint:disable: max-classes-per-file
+/**
+ * @dev A promise-compatible type that exposes a `txHash` field.
+ *      Not used by BaseContract, but generated contracts will return it in
+ *      `awaitTransactionSuccessAsync()`.
+ *      Maybe there's a better place for this.
+ */
+export class PromiseWithTransactionHash<T> implements PromiseLike<T> {
+    public readonly txHashPromise: Promise<string>;
+    private readonly _promise: Promise<T>;
+    constructor(txHashPromise: Promise<string>, promise: Promise<T>) {
+        this.txHashPromise = txHashPromise;
+        this._promise = promise;
+    }
+    public then<TResult>(
+        onFulfilled?: (v: T) => TResult | PromiseLike<TResult>,
+        onRejected?: (reason: any) => PromiseLike<never>,
+    ): PromiseLike<TResult> {
+        return this._promise.then<TResult>(onFulfilled, onRejected);
+    }
+}
+
+const REVERT_ERROR_SELECTOR = '08c379a0';
+const REVERT_ERROR_SELECTOR_OFFSET = 2;
+const REVERT_ERROR_SELECTOR_BYTES_LENGTH = 4;
+const REVERT_ERROR_SELECTOR_END = REVERT_ERROR_SELECTOR_OFFSET + REVERT_ERROR_SELECTOR_BYTES_LENGTH * 2;
+
 export class BaseContract {
-    protected _ethersInterfacesByFunctionSignature: EthersInterfaceByFunctionSignature;
+    protected _abiEncoderByFunctionSignature: AbiEncoderByFunctionSignature;
     protected _web3Wrapper: Web3Wrapper;
     public abi: ContractAbi;
     public address: string;
@@ -38,7 +68,7 @@ export class BaseContract {
         return type === 'address' ? value.toLowerCase() : value;
     }
     protected static _bigNumberToString(_type: string, value: any): any {
-        return _.isObject(value) && value.isBigNumber ? value.toString() : value;
+        return BigNumber.isBigNumber(value) ? value.toString() : value;
     }
     protected static _lookupConstructorAbi(abi: ContractAbi): ConstructorAbi {
         const constructorAbiIfExists = _.find(
@@ -46,7 +76,7 @@ export class BaseContract {
             (abiDefinition: AbiDefinition) => abiDefinition.type === AbiType.Constructor,
             // tslint:disable-next-line:no-unnecessary-type-assertion
         ) as ConstructorAbi | undefined;
-        if (!_.isUndefined(constructorAbiIfExists)) {
+        if (constructorAbiIfExists !== undefined) {
             return constructorAbiIfExists;
         } else {
             // If the constructor is not explicitly defined, it won't be included in the ABI. It is
@@ -60,12 +90,9 @@ export class BaseContract {
             return defaultConstructorAbi;
         }
     }
-    protected static _bnToBigNumber(_type: string, value: any): any {
-        return _.isObject(value) && value._bn ? new BigNumber(value.toString()) : value;
-    }
     protected static async _applyDefaultsToTxDataAsync<T extends Partial<TxData | TxDataPayable>>(
         txData: T,
-        txDefaults: Partial<TxData>,
+        txDefaults: Partial<TxData> | undefined,
         estimateGasAsync?: (txData: T) => Promise<number>,
     ): Promise<TxData> {
         // Gas amount sourced with the following priorities:
@@ -73,24 +100,39 @@ export class BaseContract {
         // 2. Global config passed in at library instantiation
         // 3. Gas estimate calculation + safety margin
         const removeUndefinedProperties = _.pickBy.bind(_);
+        const finalTxDefaults: Partial<TxData> = txDefaults || {};
         const txDataWithDefaults = {
-            ...removeUndefinedProperties(txDefaults),
+            ...removeUndefinedProperties(finalTxDefaults),
             ...removeUndefinedProperties(txData),
         };
-        if (_.isUndefined(txDataWithDefaults.gas) && !_.isUndefined(estimateGasAsync)) {
+        if (txDataWithDefaults.gas === undefined && estimateGasAsync !== undefined) {
             txDataWithDefaults.gas = await estimateGasAsync(txDataWithDefaults);
         }
         return txDataWithDefaults;
+    }
+    protected static _throwIfRevertWithReasonCallResult(rawCallResult: string): void {
+        if (rawCallResult.slice(REVERT_ERROR_SELECTOR_OFFSET, REVERT_ERROR_SELECTOR_END) === REVERT_ERROR_SELECTOR) {
+            const revertReasonArray = AbiEncoder.create('(string)').decodeAsArray(
+                ethers.utils.hexDataSlice(rawCallResult, REVERT_ERROR_SELECTOR_BYTES_LENGTH),
+            );
+            if (revertReasonArray.length !== 1) {
+                throw new Error(
+                    `Cannot safely decode revert reason: Expected an array with one element, got ${revertReasonArray}`,
+                );
+            }
+            const revertReason = revertReasonArray[0];
+            throw new Error(revertReason);
+        }
     }
     // Throws if the given arguments cannot be safely/correctly encoded based on
     // the given inputAbi. An argument may not be considered safely encodeable
     // if it overflows the corresponding Solidity type, there is a bug in the
     // encoder, or the encoder performs unsafe type coercion.
-    public static strictArgumentEncodingCheck(inputAbi: DataItem[], args: any[]): void {
-        const coder = ethers.utils.AbiCoder.defaultCoder;
+    public static strictArgumentEncodingCheck(inputAbi: DataItem[], args: any[]): string {
+        const abiEncoder = AbiEncoder.create(inputAbi);
         const params = abiUtils.parseEthersParams(inputAbi);
-        const rawEncoded = coder.encode(params.names, params.types, args);
-        const rawDecoded = coder.decode(params.names, params.types, rawEncoded);
+        const rawEncoded = abiEncoder.encode(args);
+        const rawDecoded = abiEncoder.decodeAsArray(rawEncoded);
         for (let i = 0; i < rawDecoded.length; i++) {
             const original = args[i];
             const decoded = rawDecoded[i];
@@ -102,20 +144,22 @@ export class BaseContract {
                 );
             }
         }
+        return rawEncoded;
     }
-    protected _lookupEthersInterface(functionSignature: string): ethers.Interface {
-        const ethersInterface = this._ethersInterfacesByFunctionSignature[functionSignature];
-        if (_.isUndefined(ethersInterface)) {
+    protected _lookupAbiEncoder(functionSignature: string): AbiEncoder.Method {
+        const abiEncoder = this._abiEncoderByFunctionSignature[functionSignature];
+        if (abiEncoder === undefined) {
             throw new Error(`Failed to lookup method with function signature '${functionSignature}'`);
         }
-        return ethersInterface;
+        return abiEncoder;
     }
     protected _lookupAbi(functionSignature: string): MethodAbi {
         const methodAbi = _.find(this.abi, (abiDefinition: AbiDefinition) => {
             if (abiDefinition.type !== AbiType.Function) {
                 return false;
             }
-            const abiFunctionSignature = abiUtils.getFunctionSignature(abiDefinition);
+            // tslint:disable-next-line:no-unnecessary-type-assertion
+            const abiFunctionSignature = new AbiEncoder.Method(abiDefinition as MethodAbi).getSignature();
             if (abiFunctionSignature === functionSignature) {
                 return true;
             }
@@ -123,24 +167,44 @@ export class BaseContract {
         }) as MethodAbi;
         return methodAbi;
     }
+    protected _strictEncodeArguments(functionSignature: string, functionArguments: any): string {
+        const abiEncoder = this._lookupAbiEncoder(functionSignature);
+        const inputAbi = abiEncoder.getDataItem().components;
+        if (inputAbi === undefined) {
+            throw new Error(`Undefined Method Input ABI`);
+        }
+        const abiEncodedArguments = abiEncoder.encode(functionArguments);
+        return abiEncodedArguments;
+    }
     constructor(
         contractName: string,
         abi: ContractAbi,
         address: string,
-        provider: Provider,
-        txDefaults?: Partial<TxData>,
+        supportedProvider: SupportedProvider,
+        callAndTxnDefaults?: Partial<CallData>,
     ) {
+        assert.isString('contractName', contractName);
+        assert.isETHAddressHex('address', address);
+        const provider = providerUtils.standardizeOrThrow(supportedProvider);
+        if (callAndTxnDefaults !== undefined) {
+            assert.doesConformToSchema('callAndTxnDefaults', callAndTxnDefaults, schemas.callDataSchema, [
+                schemas.addressSchema,
+                schemas.numberSchema,
+                schemas.jsNumber,
+            ]);
+        }
         this.contractName = contractName;
-        this._web3Wrapper = new Web3Wrapper(provider, txDefaults);
+        this._web3Wrapper = new Web3Wrapper(provider, callAndTxnDefaults);
         this.abi = abi;
         this.address = address;
         const methodAbis = this.abi.filter(
             (abiDefinition: AbiDefinition) => abiDefinition.type === AbiType.Function,
         ) as MethodAbi[];
-        this._ethersInterfacesByFunctionSignature = {};
+        this._abiEncoderByFunctionSignature = {};
         _.each(methodAbis, methodAbi => {
-            const functionSignature = abiUtils.getFunctionSignature(methodAbi);
-            this._ethersInterfacesByFunctionSignature[functionSignature] = new ethers.Interface([methodAbi]);
+            const abiEncoder = new AbiEncoder.Method(methodAbi);
+            const functionSignature = abiEncoder.getSignature();
+            this._abiEncoderByFunctionSignature[functionSignature] = abiEncoder;
         });
     }
 }

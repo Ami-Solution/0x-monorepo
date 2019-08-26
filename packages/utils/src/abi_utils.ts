@@ -1,14 +1,19 @@
 import { AbiDefinition, AbiType, ContractAbi, DataItem, MethodAbi } from 'ethereum-types';
-import * as ethers from 'ethers';
 import * as _ from 'lodash';
 
 import { BigNumber } from './configured_bignumber';
 
+type ParamName = null | string | NestedParamName;
+interface NestedParamName {
+    name: string | null;
+    names: ParamName[];
+}
+
 // Note(albrow): This function is unexported in ethers.js. Copying it here for
 // now.
 // Source: https://github.com/ethers-io/ethers.js/blob/884593ab76004a808bf8097e9753fb5f8dcc3067/contracts/interface.js#L30
-function parseEthersParams(params: DataItem[]): { names: ethers.ParamName[]; types: string[] } {
-    const names: ethers.ParamName[] = [];
+function parseEthersParams(params: DataItem[]): { names: ParamName[]; types: string[] } {
+    const names: ParamName[] = [];
     const types: string[] = [];
 
     params.forEach((param: DataItem) => {
@@ -21,7 +26,7 @@ function parseEthersParams(params: DataItem[]): { names: ethers.ParamName[]; typ
 
             const result = parseEthersParams(param.components);
             names.push({ name: param.name || null, names: result.names });
-            types.push('tuple(' + result.types.join(',') + ')' + suffix);
+            types.push(`tuple(${result.types.join(',')})${suffix}`);
         } else {
             names.push(param.name || null);
             types.push(param.type);
@@ -37,12 +42,12 @@ function parseEthersParams(params: DataItem[]): { names: ethers.ParamName[]; typ
 // returns true if x is equal to y and false otherwise. Performs some minimal
 // type conversion and data massaging for x and y, depending on type. name and
 // type should typically be derived from parseEthersParams.
-function isAbiDataEqual(name: ethers.ParamName, type: string, x: any, y: any): boolean {
-    if (_.isUndefined(x) && _.isUndefined(y)) {
+function isAbiDataEqual(name: ParamName, type: string, x: any, y: any): boolean {
+    if (x === undefined && y === undefined) {
         return true;
-    } else if (_.isUndefined(x) && !_.isUndefined(y)) {
+    } else if (x === undefined && y !== undefined) {
         return false;
-    } else if (!_.isUndefined(x) && _.isUndefined(y)) {
+    } else if (x !== undefined && y === undefined) {
         return false;
     }
     if (_.endsWith(type, '[]')) {
@@ -63,7 +68,7 @@ function isAbiDataEqual(name: ethers.ParamName, type: string, x: any, y: any): b
     if (_.startsWith(type, 'tuple(')) {
         if (_.isString(name)) {
             throw new Error('Internal error: type was tuple but names was a string');
-        } else if (_.isNull(name)) {
+        } else if (name === null) {
             throw new Error('Internal error: type was tuple but names was null');
         }
         // For tuples, we iterate through the underlying values and check each
@@ -89,7 +94,7 @@ function isAbiDataEqual(name: ethers.ParamName, type: string, x: any, y: any): b
             //
             const nestedName = _.isString(name.names[i])
                 ? (name.names[i] as string)
-                : ((name.names[i] as ethers.NestedParamName).name as string);
+                : ((name.names[i] as NestedParamName).name as string);
             if (!isAbiDataEqual(name.names[i], types[i], x[nestedName], y[nestedName])) {
                 return false;
             }
@@ -115,7 +120,7 @@ function splitTupleTypes(type: string): string[] {
     if (_.endsWith(type, '[]')) {
         throw new Error('Internal error: array types are not supported');
     } else if (!_.startsWith(type, 'tuple(')) {
-        throw new Error('Internal error: expected tuple type but got non-tuple type: ' + type);
+        throw new Error(`Internal error: expected tuple type but got non-tuple type: ${type}`);
     }
     // Trim the outtermost tuple().
     const trimmedType = type.substring('tuple('.length, type.length - 1);

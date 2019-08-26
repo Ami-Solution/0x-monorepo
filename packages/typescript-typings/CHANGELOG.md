@@ -5,7 +5,83 @@ Edit the package's CHANGELOG.json file only.
 
 CHANGELOG
 
-## v1.0.4 - _August 13, 2018_
+## v4.2.3 - _July 13, 2019_
+
+    * Dependencies updated
+
+## v4.2.2 - _April 11, 2019_
+
+    * Dependencies updated
+
+## v4.2.1 - _March 21, 2019_
+
+    * Dependencies updated
+
+## v4.2.0 - _March 20, 2019_
+
+    * Add optional types to optimizer settings (#1682)
+
+## v4.1.0 - _February 25, 2019_
+
+    * Add back custom web3-provider-engine type definitions (#1627)
+
+## v4.0.0 - _February 5, 2019_
+
+    * Upgrade the bignumber.js to v8.0.2 (#1517)
+
+## v3.0.8 - _January 15, 2019_
+
+    * Dependencies updated
+
+## v3.0.7 - _January 11, 2019_
+
+    * Dependencies updated
+
+## v3.0.6 - _December 13, 2018_
+
+    * Dependencies updated
+
+## v3.0.5 - _December 11, 2018_
+
+    * Dependencies updated
+
+## v3.0.4 - _November 9, 2018_
+
+    * Dependencies updated
+
+## v3.0.3 - _October 18, 2018_
+
+    * Dependencies updated
+
+## v3.0.2 - _October 4, 2018_
+
+    * Dependencies updated
+
+## v3.0.1 - _October 2, 2018_
+
+    * Dependencies updated
+
+## v3.0.0 - _September 28, 2018_
+
+    * Remove types for ethers.js (#1069)
+
+## v2.0.2 - _September 25, 2018_
+
+    * Dependencies updated
+
+## v2.0.1 - _September 21, 2018_
+
+    * Dependencies updated
+
+## v2.0.0 - _September 5, 2018_
+
+    * Remove types for web3-provider-engine, newman, ganache-core, detect-node, eth-lightwallet (#1052)
+
+## v1.0.5 - _August 24, 2018_
+
+    * Dependencies updated
+
+## v1.0.4 - _August 14, 2018_
 
     * Dependencies updated
 
